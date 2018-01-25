@@ -1,0 +1,57 @@
+---
+title: "Discussion Session 3"
+output: html_notebook
+---
+
+```{r setup, echo=FALSE}
+library(data.table)
+library(ggplot2)
+library(uwIntroStats)
+
+psa <- as.data.table(read.table("../data/psa.txt", header=TRUE, stringsAsFactors = FALSE))
+
+```
+
+# Data Visualization
+```{r}
+ggplot(psa) + geom_point(aes(nadirpsa, obstime))
+```
+
+```{r}
+ggplot(psa) + geom_point(aes(pretxpsa, nadirpsa))
+```
+
+
+```{r}
+psa[,relapse24:=ifelse(inrem=='no' & obstime<=24,1,0)]
+psa[,high:=ifelse(nadirpsa>=median(nadirpsa), 1, 0)]
+
+mod1 = glm(relapse24~high, family='binomial', data=psa)
+summary(mod1)
+```
+
+The p-value is testing the H that there's no difference in log odds, or that the true value of B1 == 0. 
+
+To report results, you exponentiate the diff of log odds ==> Odds Ratio
+
+We exponentiate estimate +/- 1.96*SE ==> transform by exponentiatting. 
+
+```{r}
+mod2 <- glm(relapse24~nadirpsa, family='binomial', data=psa)
+
+mod2.pointest <- exp(summary(mod2)$coefficients['nadirpsa', "Estimate"])
+mod2.95ci <- mod2.pointest + c(-1,1)*qnorm(.975)*summary(mod2)$coefficients["nadirpsa", "Std. Error"]
+
+mod2.95ci
+```
+
+```{r}
+psa[,log2_nadirpsa:=log(nadirpsa)/log(2)]
+mod3 <- glm(relapse24~log2_nadirpsa, family='binomial', data=psa)
+mod3.pointest <- exp(summary(mod3)$coefficients['log2_nadirpsa', "Estimate"])
+mod3.95ci <- mod3.pointest + c(-1,1)*qnorm(.975)*summary(mod3)$coefficients["log2_nadirpsa", "Std. Error"]
+
+mod3.95ci
+
+```
+

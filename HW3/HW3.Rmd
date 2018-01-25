@@ -1,0 +1,34 @@
+---
+title: "Homework 2"
+author: "Piotr Mankowski"
+date: "January 19, 2018"
+output:
+  html_notebook: default
+  pdf_document: default
+---
+
+
+```{r setup}
+library(data.table)
+library(uwIntroStats)
+library(regress)
+
+mri = as.data.table(read.table("../data/mri.txt", header=TRUE, stringsAsFactors = FALSE))
+mri[, obstime_yr:=obstime/365]
+mri[, dead_at_5:=ifelse((obstime_yr <= 5.0 & death == 1), 1, 0), by='ptid']
+
+```
+
+## Question 1
+*Perform a statistical analysis evaluating an association between **serum creatinine level** and **5 year all-cause mortality** by comparing **geometric mean serum creatinine levels** between groups defined by vital status at 5 years.   In your analysis, allow for heteroscedasticity.  Provide full statistical inference about an association between creatinine and 5 year all-cause mortality.*
+
+Basically, we're examining the association between `crt` and `dead_at_5yr` using geometric means (like in the discussion). 
+
+```{r}
+
+```
+
+### Methods
+### Inference
+
+#### a) What are the sample size, sample mean and sample standard deviation of serum creatinine levels among subjects who survived at least 5 years? 

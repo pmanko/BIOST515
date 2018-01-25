@@ -1,0 +1,184 @@
+---
+title: "Homework 2"
+author: "Piotr Mankowski"
+date: "January 19, 2018"
+output:
+  html_notebook: default
+  pdf_document: default
+---
+
+
+```{r setup}
+library(data.table)
+library(uwIntroStats)
+library(regress)
+
+mri = as.data.table(read.table("../data/mri.txt", header=TRUE, stringsAsFactors = FALSE))
+
+mri[, obstime_yr:=obstime/365]
+
+mri[, dead_at_5:=ifelse(obstime_yr <= 5.0 & death, 1, 0), by='ptid']
+
+# mri[, vital_5_yr:=0]
+# mri[obstime_yr <= 5 & !death, vital_5_yr:=NA]
+# mri[obstime_yr > 5, vital_5_yr:=1]
+# mri[,dead_at_5:=as.integer(!vital_5_yr)]
+```
+
+## Question 1
+*In this question, you will perform statistical analyses evaluating an association between serum creatinine levels (measured from blood) and 5 year all-cause mortality by comparing mean creatinine levels across groups defined by vital status at 5 years using a t-test that presumes homoscedasticity (i.e., equal variances across groups). As this problem is directed toward illustrating correspondences between the t-test and linear regression, you do not need to provide full statistical inference for this problem. Instead, just answer the following questions.*
+
+#### a) What are the sample size, sample mean and sample standard deviation of serum creatinine levels among subjects who survived at least 5 years? 
+```{r, echo=FALSE}
+# serum creatinine levels: crt
+# vital status: vital_5_yr
+
+r1a <- descrip(mri[vital_5_yr==1]$crt)
+r1a
+
+```
+The sample size for the serum creatinine levels is `614`, of which `2` values are missing. The sample mean is `1.03 mg/dl`, and the sample standard deviation is `0.246 mg/dl`.
+
+#### b) What are the sample size, sample mean and sample standard deviation of creatinine levels among subjects who died within 5 years? 
+```{r, echo=FALSE}
+r1b <- descrip(mri[vital_5_yr==0]$crt)
+r1b
+```
+The sample size for the serum creatinine levels is `121`, of which no values are missing. The sample mean is `1.22 mg/dl`, and the sample standard deviation is `0.475 mg/dl`.
+
+#### c) What are the point estimate, the estimated standard error of that point estimate, and the 95% confidence interval for the mean creatinine level in a population of similar subjects who would survive at least 5 years?
+
+
+We can use the sample mean from **part a** for the point estimate for the mean creatine level of population of subjects similar to our sample population who would survive at least 5 years.  
+```{r, echo=FALSE}
+se_1c <- r1a[4]/(r1a[1] - r1a[2] - 1)
+ci_1c <- c(r1a[3] - 1.96*se_1c, r1a[3]+1.96*se_1c)
+sprintf("pe: %.3f; standard_error: %.6f; conf_interval::(%.3f, %.3f)", r1a[3], se_1c, ci_1c[1], ci_1c[2])
+```
+
+
+#### d) What are the point estimate, the estimated standard error of that point estimate, and the 95% confidence interval for the mean creatinine level in a population of similar subjects who would die within 5 years? 
+
+
+We can use the sample mean from **part b** for the point estimate for the mean creatine level of population of subjects similar to our sample population who would survive at least 5 years.  
+
+```{r, echo=FALSE}
+se_1d <- r1b[4]/(r1b[1] - r1b[2] - 1)
+ci_1d <- c(r1b[3] - 1.96*se_1c, r1b[3]+1.96*se_1c)
+sprintf("pe: %.3f; standard_error: %.6f; conf_interval::(%.3f, %.3f)", r1b[3], se_1d, ci_1d[1], ci_1d[2])
+```
+
+
+
+#### e) What are the point estimate and the 95% confidence interval for the difference in creatinine means between a population of similar subjects that survives at least 5 years and a population of similar subjects that dies within 5 years? What is the P value for testing the hypothesis that the two populations have the same mean creatinine level? What conclusions do you reach about a statistically significant association between serum creatinine and 5 year all-cause mortality?
+
+(Note: Originally I ran this T Test without assuming homoscedasticity. I changed it after reading question #3. Hopefully, I fully propagated the effects).
+
+```{r, echo=FALSE}
+r1e <- t.test(crt~vital_5_yr, data=mri, var.equal=TRUE)
+r1e
+sprintf("95%% CI: (%.3f, %.3f)", r1e$conf.int[1], r1e$conf.int[2])
+```
+
+We can get these values using a 2-sided t.test comparing the two groups. The point estimate for the difference in creatine levels between the two groups is `1.216 - 1.034 = 0.182 mg/dl`, with the surviving group having a lower mean creatine level. The 95% confidence interval suggests that the observation is not unusual if the true difference in mean creatinine level between the two groups is between `(0.124, 0.239) mg/dl`. The two-sided p-value for the test is < `0.05`; thus, we reject the null hypothesis that the mean levels of creatinine of the two mortality groups are equal, 
+
+#### f) Although we did not consider age at the time of enrollment in the questions above, could the association analysis for creatinine level and 5 year all-cause mortality conducted using the t-test potentially be confounded by the age of the subjects at the time of the MRI?  Briefly explain why or why not this is plausible?  Provide any descriptive statistics (e.g. an appropriate table, plot, etc.) giving evidence for or against the association results and conclusions above with the t-test potentially being confounded by age.
+
+This is a plausible suggestion; the two vitality groups have statistically significantly different ages, as illustrated by the following descriptions and T test results. The participant that are still alive at the 5-year mark are slightly younger (mean age of `74.2` vs. `76.5` in the deceaced at 5 years group). This difference in age could partially explain the difference is creatine levels, independent of 5 year mortality status. 
+
+```{r}
+descrip(mri$age, strata = mri$vital_5_yr)
+t.test(age~vital_5_yr, data=mri, var.equal=TRUE)
+```
+
+
+## Question 2
+*Perform statistical analyses evaluating an association between serum creatinine and 5 year all-cause mortality by comparing mean creatinine levels across groups defined by vital status at 5 years using linear regression that presumes homoscedasticity. As this problem is directed toward illustrating correspondences between the t test and linear regression, you do not need to provide full statistical inference for this problem. Instead, just answer the following questions.*
+
+#### a) Fit a regression model where the response variable is creatinine level and the predictor variable is an indicator variable for a subject dying within 5 years (i.e., a value of 1 if subject died within 5 years, and a value of 0 if the subject survived at least 5 years).   Provide an interpretation of the intercept and slope of this regression model.
+
+For question 1, my mortality variable was flipped from the definition of this quesion: 1 indicated the participant was alive at 5 years, and 0 indicated they were dead at 5 years.
+For this question, I create a new variable that is the inverse of the q1 variable.
+
+```{r}
+mri[,dead_at_5:=as.integer(!vital_5_yr)]
+
+r2a <- lm(crt~dead_at_5, data=mri)
+summary(r2a)
+```
+
+For this regression, the intercept of `1.034 mg/dl` corresponds to the mean sample creatinine level of those who survived at least 5 years. The slope of `0.182 mg/dl` indicates the difference in mean creatine level between the two mortality groups in our sample.  
+
+#### b) Is the regression model you fit a saturated model? Briefly explain why or why not.
+
+This model is a saturated model, since our predictor variable - mortality at 5 years - has two values, and our regression model has two parameters (Beta0 and Beta1). Since the number of predictor variable groups (2) equals the number of model parameters, this model is "saturated".
+
+#### c) Using the parameter estimates from the regression model, what is the estimate of the mean creatinine level in a population of similar subjects who would die within 5 years? How does this compare to the corresponding estimate from problem 1? If there are any differences, explain the source of the differences.
+
+To get the point estimate for a population of subjects similar to those in our sample who died within 5 years, I would plug in `1` into our regression model using the slope and itercept from the previous question.
+
+```{r}
+r2c <- r2a$coefficients[1] + r2a$coefficients[2] * 1
+sprintf("Etimate of mean creatine level of subjects dead within 5 years: %.3f mg/dl", r2c)
+```
+
+This estimate is exactly the result from question 1's estimate of means in the two groups, since classical linear regression is an extension of the t-test that assumes homoscesadicity. 
+
+#### d) Using the parameter estimates from the regression model, what is an estimate of the mean creatinine level in a population of similar subjects who would survive at least 5 years? How does this compare to the corresponding estimate from problem 1? If there are any differences, explain the source of the differences.
+
+Since those surviving at least 5 years had a value of `0` for the predictor mortality variable, the estimate of the mean creatine level for a similar population is equal to the intercept parameter from the regression model. 
+```{r}
+r2d <- r2a$coefficients[1]
+sprintf("Etimate of mean creatine level of subjects surviving 5 years: %.3f mg/dl", r2d)
+```
+
+Again, the value is exactly the value from question 1. 
+
+#### e) Using the results from the regression model, provide a 95% confidence interval for mean creatinine level among a population of subjects who survive at least 5 years? How does this compare to the corresponding estimate from problem 1? If there are any differences, explain the source of the differences. 
+
+```{r}
+round(confint.default(r2a)[1,], digits=3)
+```
+This confidence interval is wider than the one from question 1 part c. Confidence intervals for classic LR for parameters are calculated using pooled variance; the calculation in question 1 only considered the variance in each individual group. 
+
+#### f)	If we presume the variances are equal in the two populations, what is the regression based estimates of the standard deviation and the variance within each group from the regression model? 
+
+Since we're assuming homoscedasticity, we can use the residual standard error (`0.296`) as the standard deviation value for each group. Squaring this value, we would get a variance of `0.0876`. 
+
+#### g)	Using the parameter estimates from the regression model, what are the point estimate, the estimated standard error of the point estimate, and the 95% confidence interval for the difference in means between a population that survives at least 5 years and a population that dies within 5 years? What is the P value for testing the hypothesis that the two populations have the same mean creatinine level? What conclusions do you reach about a statistically significant association between serum creatinine level and 5 year all-cause mortality? How does this compare to the corresponding inference from problem 1?
+
+```{r}
+summary(r2a)
+confint.default(r2a)
+```
+- Point estimate: `0.182 mg/dl`
+- SE of point estimate: `0.0294`
+- 95% CI: `(0.124, 0.239)`
+- p-value: `1.07e-09`
+
+The regression results suggest that we can reject the null hypothesis that there is no linear association between creatinine levels and 5-year mortality, which corresponds to the conclusion reached in question 1.
+
+## Question 3
+*Perform statistical analyses evaluating an association between serum creatinine level and 5 year all-cause mortality by comparing mean creatinine levels across groups defined by vital status at 5 years using a t-test that allows for heteroscedasticity (i.e., the possibility of unequal variances across groups).  What is the P value for testing the hypothesis that the two populations have the same mean creatinine level? What conclusions do you reach about a statistically significant association between serum creatinine and 5 year all-cause mortality? How do the results of this analysis differ from the results from problem 1 where a t-test that presumes homoscedasticity is used? If there are any differences, explain the source of the differences.  (Again, we do not need a formal report of the inference.)*
+
+```{r}
+r3 <- t.test(crt~vital_5_yr, data=mri)
+r3
+```
+- P-value: 7.011e-05
+- The results suggest that we should reject the null hypothesis that the difference in means between the groups is 0 and that here's a significant association between creatinine levels and 5 year all-cause mortality. 
+- The conclusions of the analysis don't differ from problem 1, where a t test assuming homoscedaticity was used. However, the confidence interval in this case is wider than in question 1, since it takes into account the two different variances in the two groups
+
+## Question 4
+*Perform statistical analyses evaluating an association between serum creatinine and 5 year all-cause mortality by comparing mean creatinine levels across groups defined by vital status at 5 years using a linear regression model that allows for heteroscedasticity. What is the P value for testing the hypothesis that the two populations have the same mean creatinine level? What conclusions do you reach about a statistically significant association between serum creatinine and 5 year all-cause mortality? How do the results of this analysis differ from the results in problem 3 where a t-test that allows for heteroscedasticity is used? If there are any differences, explain the source of the differences. (Again, we do not need a formal report of the inference.)*
+```{r}
+library(sandwich)
+library(lmtest)
+
+lr <-lm(crt~vital_5_yr,data=mri)
+coeftest(lr, vcov=vcovHC(lr, "HC0"))
+```
+
+- p-value: 4.194e-05
+- conclusion: We reach the same conclusion as in the other parts, that we should reject the null hypothesis. 
+- Difference: again, the interpretation is the same, but the specific values are slightly different (including the p-value, which is the same magnitude but sligtly smaller in this case)
