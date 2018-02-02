@@ -36,3 +36,4 @@ vignettes/*.pdf
 # Custom
 Resources/*
 data/*
+.Rproj.user

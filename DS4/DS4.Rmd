@@ -1,0 +1,34 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+library(data.table)
+library(uwIntroStats)
+library(ggplot2)
+
+mri <- as.data.table(read.table("../data/mri.txt", header=TRUE, stringsAsFactors = FALSE))
+mri[, obstime_yr:=obstime/365]
+mri[, dead_at_5yr:=ifelse((obstime_yr <= 5.0 & death == 1), 1, 0), by='ptid']
+
+# Log-transform response
+mri[,crt_log2:=log(crt)/log(2)]
+mri[,crt_log:=log(crt)]
+mri[,decades:=age/10]
+```
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+regress("mean", dsst ~ age * male, data=mri);
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.

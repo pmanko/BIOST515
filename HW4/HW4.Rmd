@@ -1,0 +1,193 @@
+---
+title: "Homework 4"
+author: "Piotr Mankowski"
+date: "February, 2018"
+output:
+  pdf_document: default
+  html_notebook: default
+  html_document:
+    df_print: paged
+---
+
+
+```{r setup, include=FALSE, warning=FALSE}
+library(data.table)
+library(uwIntroStats)
+library(ggplot2)
+
+mri <- as.data.table(read.table("../data/mri.txt", header=TRUE, stringsAsFactors = FALSE))
+mri[, obstime_yr:=obstime/365]
+mri[, dead_at_5yr:=ifelse((obstime_yr <= 5.0 & death == 1), 1, 0), by='ptid']
+
+# Creatine Levels
+mri[!is.na(crt), high_crt:=ifelse((crt > 1.2), 1, 0), by='ptid']
+
+knitr::opts_chunk$set(warning=FALSE)
+
+```
+
+## Question 1
+**Prospective logistic regression analysis of the association between serum creatinine level and 5-year all-cause mortality. Mortality is the response variable, and serum creatinine level is the predictor.**
+
+### Response vs. Predictor
+```{r}
+# Plot response vs. predictor
+ggplot(data=mri) + geom_jitter(aes(dead_at_5yr, high_crt))
+```
+```{r}
+mod1 = glm(dead_at_5yr~high_crt, family='binomial', data=mri)
+
+mod1.pointest <- exp(summary(mod1)$coefficients['high_crt', "Estimate"])
+mod1.intercept <- exp(summary(mod1)$coefficients['(Intercept)', "Estimate"])
+mod1.95ci <- mod1.pointest + c(-1,1)*qnorm(.975)*summary(mod1)$coefficients["high_crt", "Std. Error"]
+
+summary(mod1)
+```
+
+a. *Is this a saturated model? Explain your answer.* 
+
+In a saturated regression model, the number of groups of the predictor variable equal the number of parameters in the model. Logstic regression fits a single parameter, $p$. Since the predictor variable is binomial (high and low crt), it has two groups. This is more than the number of parameters, so this is not a saturated regression model. 
+
+b. *Interpretation of the slope and intercept.* 
+
+```{r}
+mod1b <- regress("odds", dead_at_5yr~high_crt, data=mri)
+
+sprintf("Exponentiated Slope: %.3f Exponentiated Intercept: %.3f", mod1.pointest, mod1.intercept)
+```
+
+The intercept gives us the log odds when the predictor is 0, while the transformed intercept ($\beta_0 = 0.156$) represents the odds of the response when the predictor is 0. In this case, the intercepts gives us the odds of being dead at 5 years given you have low creatinine levels. 
+
+The slope gives us the estimated difference in log odds of being dead at 5 years for two groups differing by 1 in the predictor variable. Since our predictor is binary, the slope gives us the difference in log odds between the two mortality groups. When exponentiated, the intercept ($\beta_1 = 2.367$) gives us the odds ratio between the two groups. 
+
+In this case, the model estimates that the high-creatinine group (high_crt == 1) has a $100*(2.367-1) = 136.7%$ higher odds of being dead at 5 years than the low-creatinine group.
+
+c. *Estimated odds and probability of dying within 5 years for subjects with low creatinine levels.* 
+
+To get estimated odds of dying within 5 years ('dead_at_5yr == 0') for subjects with low creatinine ('high_crt == 0'), we can use the value for the exponentiated intercept, since it represents the odds when the predictor ('high_crt') is 0. We can get the estimated probability by tranforming the odds, since $odds = p/(1-p)$ and $p = odds/(1 + odds)$
+
+```{r}
+o <- mod1.intercept
+p <- o/(1+o)
+sprintf("Odds: %.3f Probability: %.3f", o, p)
+```
+
+d. *Comparing sample odds/probability with estimates for low creatinine*
+```{r}
+sample_p <- mri[high_crt == 0, mean(dead_at_5yr)]
+sample_o <- sample_p/(1 - sample_p)
+
+sprintf("Sample odds: %.3f Sample proportion: %.3f", sample_o, sample_p)
+```
+
+The sample odds and proportion for those who died within 5 years in teh low serum creatinine group are virtually equal to the estimates we got in the logistic regression. This simmilarity is not suprising, since the model was trained on this data, and would be expected to make the estimates based on the actual proportions in each of the four predictor/response groups (since each variable is binary, we have 4 quadrants in the data, and our logistic regression is simmilar to a $\chi^2$ test.)
+
+e. *Estimated odds and probability of dying within 5 years for subjects with high creatinine levels.* 
+
+To get the odds and probability in the high-creatinine group, we can use the intercept and multiply it by the slope. Since the slope represents the odds ratio between the groups ($Odds_1/Odds_0 = slope$), we can get the odds for the high creatinine group: $Odds_1 = Odds_0 * slope$
+
+```{r}
+o_1 <- o * mod1.pointest
+p_1 <- o_1/(1+o_1)
+
+sprintf("Odds: %.3f Probability: %.3f", o_1, p_1)
+```
+
+f. *Comparing sample odds/probability with estimates for high creatinene*
+```{r}
+sample_p_1 <- mri[high_crt == 1, mean(dead_at_5yr)]
+sample_o_1 <- sample_p_1/(1 - sample_p_1)
+
+sprintf("Sample odds: %.3f Sample proportion: %.3f", sample_o_1, sample_p_1)
+```
+
+Again, the sample odds and proportion match the estimates from the logistic regression model. This simmilarity is still not suprising, since the model was trained on this data, and would be expected to make the estimates based on the actual proportions in the sample. 
+
+g. *Full inference between 5-year all-cause mortality and high creatinine levels.* 
+
+We performed logistic regression analysis to investigate the association between 5-year all-cause mortality and high serum creatinine. From the analysis, we estimate that the odds of dying are 137% higher in the high-creatinine group than the low-creatinine group. A 95% CI suggests that the results would not be suprising if the real odds of dying within 5 years were between 94.6% and 179% higher in the high-creatinine group. A two-sided p-value of < 0.0005 suggests we should reject the null hypothesis that creatinine level has association with 5-year all-cause mortality. 
+
+h. *Effect of using low creatinine level as predictor*
+
+In this scenario, the predictor groups would swap, with individuals labeled by a `1` in the high-creatinine group recieving a `0` in the low-creatinine group, and vice-versa. Nothing else about the analysis would change; however, swapping the 1's and 0's means that the intercept would represent the odds of dying for high-creatinine group, and the slope would adjust, with the new slope $s' = 1/s$, since the odds would decrease for the low-creatinine group. The statistical evidence would not change in any way; the labeling is arbitrary.
+
+i. *Effect of using 5-year survival as response variable*
+
+As in part h, swapping the arbitrary labeling of the response variable would affect the interprestation of the resulting estimates, but not change the statsitical evidence for the association between mortality and serum creatinine. The intercept would represent the odds of surviving 5 years ($o_s$) in the low-creatinine (high_crt == 0) group, and the slope would represent the odds ratio of 5-year survival between the two groups. Since the probability of survival ($p_s$) is related to the probability of death ($p_d$) by $p_s = 1 - p_d$, $odds_s = (1 - p_d)/(1 - 1 + p_d) = (1 - p_d)/p_d = 1/odds_d)$. Therefore, the new intercept would = the inverse of the old intercept, and the new slope the inverse of the slope from part b. 
+
+## Question 2
+**Retrospective logistic regression analysis of the association between serum creatinine level and 5-year all-cause mortality. Mortality is the predictor variable, and serum creatinine level is the response**
+
+```{r}
+mod2 <- regress("odds", high_crt~dead_at_5yr, data=mri)
+mod2.pointest <- mod2$transformed[2,1]
+mod2.intercept <- mod2$transformed[1,1]
+mod2.95ci <- c(mod2$transformed[2,2], mod2$transformed[2,3])
+
+sprintf("Slope: %.2f | Intercept: %.3f | 95%% CI: (%.2f, %.2f)", mod2.pointest, mod2.intercept, mod2.95ci[1], mod2.95ci[2])
+```
+
+a. *Interpretation of slope and intercept*
+After running the analysis and transforming the output from log odds to odds, we find the estimated slope and intercept to be `2.37` and `0.241` respectively. 
+
+In this scenario, the intercept represents the odds of the response (high serum creatinine levels, 'high_crt == 0') when 5-year all-cause mortality is false ('dead_at_5yr == 0'); in other words, it represents the odds of having had high creatinine levels for those who survived at least 5 years after the levels were measured. 
+
+The slope of 2.37 represents the odds ratio of having had high creatinine between those who died within 5 years and those who survived at least 5 years. In other words, the odds of having had high creatinine for those who died within 5 years ('dead_at_5yr == 1') are $100 * (2.37 - 1) = 136%$ higher than for those surviving at least 5 years. 
+
+b. *Probability and odds of high creatinine in those dead at 5 years*
+To get the odds for high creatinine in this group where 'dead_at_5yr == 1', we can use the intercept (odds for 'dead_at_5yr == 0') and multiply it by the slope (odds ratio between the two groups). 
+
+```{r}
+odds_h <- mod2.intercept * mod2.pointest
+p_h <- odds_h/(1 + odds_h)
+
+sprintf("Estimated odds: %.3f | Estimated probability: %.3f", odds_h, p_h)
+```
+c. *Probability and odds of high creatinene in those surviving 5 years*
+Since the predictor variable value in this case == 0, we can use the intercept as an estimate for the odds of this group. Then we just have to tranfrom it into probability.
+
+```{r}
+odds_l <- mod2.intercept
+p_l <- odds_l/(1 + odds_l)
+
+sprintf("Estimated odds: %.3f | Estimated probability: %.3f", odds_l, p_l)
+```
+
+g. *Full inference on retrospective association between 5-year all-cause mortality and high serum creatinine levels*
+
+```{r}
+sprintf("Slope: %.2f | Intercept: %.3f | 95%% CI: (%.2f, %.2f)", mod2.pointest, mod2.intercept, mod2.95ci[1], mod2.95ci[2])
+```
+
+From logistic regression analysis, we estimate that the odds of having had high serum creatinine levels are 137% higher in individuals who die within 5 years than in individuals who survive at least 5 years. A 95% CI suggests that this observation would not be unusual if the true % difference between the two groups is between 55% and 261% larger in those who experience 5-year all-cause mortality. A two-sided p-value of 1*10^-4 suggests that, at $\alpha = 0.05$, we can reject the null hypothesis of the odds being of high creatinine levels being the same in the two mortality groups. 
+
+e. *Comparison of 1g and 2d*
+
+## Question 3
+*Investigating the association between odds of death within 5 years and non-dichotomozed serum creatinine levels*
+
+In this case, the response variable - 5-year all-cause mortality ('dead_at_5yr') - is binary, while the predictor variable - serum creatinine level, ('crt') - is continuous. We can use a logistic regression to perform inference. 
+
+```{r}
+mod3 <- glm(dead_at_5yr~crt, family="binomial", data=mri)
+mod3.pointest <- exp(summary(mod3)$coefficients['crt', "Estimate"])
+mod3.intercept <- exp(summary(mod3)$coefficients["(Intercept)", "Estimate"])
+mod3.95ci <- exp(confint.default(mod3))
+mod3.pval <- summary(mod3)$coefficients[2,4]
+
+sprintf("Slope: %.3f | Intercept: %.4f | 95%% CI: (%.4f, %.2f) | p-value: 1.4e-07", mod3.pointest, mod3.intercept, mod3.95ci[1], mod3.95ci[2], mod3.pval)
+```
+a. 
+
+
+b. 
+
+“From logistic regression analysis, we estimate that for two
+groups that differ by one year in age, the odds of stroke is 3.4%
+higher in the older group, though this estimate is not statistically
+significant. A 95% CI suggests that this observation is not unusual
+if a group that is one year older might have odds of stroke that
+was anywhere from 0.8% lower or 7.8% higher than the younger
+group.” A two-sided p value of 0.113 suggests that we can not
+with high confidence reject the null hypothesis that the odds of
+stroke are not associated with age.

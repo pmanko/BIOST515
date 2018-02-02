@@ -1,34 +1,246 @@
 ---
-title: "Homework 2"
+title: "Homework 3"
 author: "Piotr Mankowski"
-date: "January 19, 2018"
+date: "January 26, 2018"
 output:
+  html_document:
+    df_print: paged
   html_notebook: default
   pdf_document: default
 ---
 
 
-```{r setup}
+```{r setup, include=FALSE, warning=FALSE}
 library(data.table)
 library(uwIntroStats)
-library(regress)
+library(ggplot2)
 
-mri = as.data.table(read.table("../data/mri.txt", header=TRUE, stringsAsFactors = FALSE))
+mri <- as.data.table(read.table("../data/mri.txt", header=TRUE, stringsAsFactors = FALSE))
 mri[, obstime_yr:=obstime/365]
-mri[, dead_at_5:=ifelse((obstime_yr <= 5.0 & death == 1), 1, 0), by='ptid']
+mri[, dead_at_5yr:=ifelse((obstime_yr <= 5.0 & death == 1), 1, 0), by='ptid']
+
+# Log-transform response
+mri[,crt_log2:=log(crt)/log(2)]
+mri[,crt_log:=log(crt)]
+
+mri[,decades:=age/10]
+knitr::opts_chunk$set(warning=FALSE)
 
 ```
 
 ## Question 1
 *Perform a statistical analysis evaluating an association between **serum creatinine level** and **5 year all-cause mortality** by comparing **geometric mean serum creatinine levels** between groups defined by vital status at 5 years.   In your analysis, allow for heteroscedasticity.  Provide full statistical inference about an association between creatinine and 5 year all-cause mortality.*
 
-Basically, we're examining the association between `crt` and `dead_at_5yr` using geometric means (like in the discussion). 
+Basically, we're examining the association between `crt` and `dead_at_5yr` using geometric means (like in the discussion). To conduct an analysis using geometric means, we can log-transform the responce variable. (See lecture 6)
 
+We want to create a linear model that compares log-transformed creatinine levels between the two groups. We can use (1) Robust SE methods, or (2) a t test allowing for heteroscedasticity. In both cases, we have to log-transform the response variable `crt`. 
+
+### Response vs. Predictor
 ```{r}
+# Plot response vs. predictor
+ggplot(data=mri) + geom_jitter(aes(dead_at_5yr, crt))
+```
+
+### Log(response) vs. Predictor
+```{r}
+# Plot transformed response vs. predictor
+ggplot(data=mri) + geom_jitter(aes(dead_at_5yr, crt_log))
 
 ```
 
-### Methods
-### Inference
+### Use t test to compare means
+```{r}
+q1_m1 <- t.test(crt_log2~dead_at_5yr, var.equal=FALSE, data=mri)
+q1_m1
+```
 
-#### a) What are the sample size, sample mean and sample standard deviation of serum creatinine levels among subjects who survived at least 5 years? 
+### Use Linear Regression w/ Robust SE to compare log-transformed means
+```{r}
+q1_m2 <- regress("mean", crt_log ~ dead_at_5yr, data=mri)
+q1_m2$coefficients[1:2, c(1,3,4,5,7)]
+```
+### Use Linear Regression w/ Robust SE to compare geometric means
+```{r}
+q1_m3 <- regress("geometric mean", crt ~ dead_at_5yr, data=mri)
+round(q1_m3$coefficients[1:2, c(1,3,4,5,6,8)], digits = 4)
+```
+
+Both approaches result in the same estimates for $\beta_0$ and $\beta_1$ - a sanity check!
+
+### Interpret $\beta_0$ and $\beta_1$
+```{r, echo = FALSE}
+# Geometric Mean of creatinine values for group surviving 5+ years
+g0_geomean <- exp(q1_m2$coefficients["(Intercept)", "Estimate"])
+# g0_geomean == exp(mean(log(mri[dead_at_5yr == 0]$crt), na.rm=TRUE))
+
+geomean_ratio <- exp(q1_m2$coefficients["dead_at_5yr", "Estimate"])
+percent_change <- 100*(exp(q1_m2$coefficients["dead_at_5yr", "Estimate"]) - 1)
+
+conf <- q1_m2$coefficients['dead_at_5yr', 4:5]
+percent_conf <- 100*(exp(conf)-1)
+
+r <- round(c(g0_geomean, geomean_ratio, percent_change, percent_conf), digits = 3)
+names(r) <- c('Group0 geomean', 'Geomean ratio', '% change', '95% CI L', '95% CI H')
+
+r
+```
+
+We performed a linear regression analysis on log-transformed blood creatine levels in this population of elderly adults using Huber-White estimates of the standard error. We dichotomized our sample by 5-year all-cause mortality, and found that the geometic mean of creatine levels is 14.14% higher in the group of participants that died within 5 years of measurement. A 95% CI suggests that this observation is not unusual if the true relationship between geometric
+means between those who died within 5 years and those who didnt is between 7.38% and 21.3% higher. Because the two-sided P value of `2.36*10^-5` is < .05, we reject the null hypothesis that there is no difference in the geometric mean of creatinine levels between the two mortality groups.
+
+## Question 2
+*Perform a regression analysis evaluating an association between serum creatinine level and age by comparing **mean serum creatinine levels** across groups defined by age as a continuous variable.   In your analysis, allow for heteroscedasticity.  (Provide formal inference where asked to.)*
+
+#### a.	Provide a brief description of the statistical methods for the model you fit to address the question of an association between creatinine and age.
+
+In order to investigate the association between creatinine levels and age in our population of elderly adults, we plan to perform a linear regression analysis - using robust standard error estimates computed using the Huber-White sandwich method - of blood creatinine levels (measured in mg/dl) on the continuous predictor age (measured in years).
+
+```{r}
+q2_lm <- regress("mean", crt~age, data=mri)
+q2_lm$coefficients[1:2, c(1,3,4,5,7)]
+```
+
+#### b.	Is this a saturated model? Explain your answer. 
+
+A saturated model is one where the number of groups of the predictor variable equal the number of parameters in the model. Regression analysis involves fitting a linear model to the data, and uses two parameters: $\beta_0$ (the intercept) and $\beta_2$ (the slope). Since in this case, we're comparing creatinine level across the continuous variable age, we have an infinite number of groups of the predictor variable, so this is not a saturated model.
+
+#### c.	Provide a scatterplot illustrating the relationship between serum creatinine and age and include in the plot the regression line from your regression analysis.  
+
+```{r, echo = FALSE}
+q2_intercept <- q2_lm$coefficients['(Intercept)', "Estimate"]
+q2_slope <- q2_lm$coefficients['age', "Estimate"]
+ggplot(data=mri) + geom_point(aes(age, crt)) + geom_abline(slope = q2_slope, intercept = q2_intercept, color='red')
+```
+
+#### d.	Based on your regression model, what is the estimated mean creatinine level among a population of 70 year old subjects?
+
+```{r, echo = FALSE}
+c(B0=round(q2_intercept, digits=3), B1=round(q2_slope, digits=5))
+```
+
+
+The fitted parameters of our linear regression model ($\beta_0 = 0.648 mg/dl; \beta_1 = 0.00557 mg/dl$) can be used to define the following linear relationship between age and creatinine levels:
+$$
+E[Creatine_i | Age_i] = 0.648 + 0.00557 * Age_i
+$$
+
+Based on this linear relationship, we can estimate the mean creatinine level of 70-year-old subjects by plugging in their age.
+
+```{r, echo = FALSE}
+mean_70 <- q2_intercept + q2_slope*70
+noquote(sprintf("Mean creatine level for 70-year-olds: %.3f", mean_70))
+```
+#### e.	Based on your regression model, what is the estimated mean creatinine level among a population of 85 year old subjects? How does the difference between your answer to this problem and your answer to part d relate to the slope?
+
+```{r, echo = FALSE}
+mean_85 <- q2_intercept + q2_slope*85
+noquote(sprintf("Mean creatine level for 85-year-olds: %.3f", mean_85))
+```
+
+The value for 85-year-olds is higher than for 70-year-olds, which makes sense due to the positive slope. The slope parameter from the linear model estimates the average change in mean creatinine level for a one-year change in age. Since our two groups are seprated by 15 years, the difference between our answer to part d) and e) is 15 times the slope.
+
+```{r, echo = FALSE}
+crt_diff <- mean_85 - mean_70
+slope_x_15 <- q2_slope * 15
+
+noquote(sprintf("Diff between d) and e): %.3f | Slope x 15: %.3f", crt_diff, slope_x_15))
+```
+
+#### f.	Based on your regression model, what is the estimated mean creatinine level among a population of 101 year old subjects?   Do you think this estimate is a reliable estimate for the mean creatinine of a population of 101 year old subjects? Briefly explain why or why not?  
+
+```{r, echo = FALSE}
+mean_101 <- q2_intercept + q2_slope*101
+noquote(sprintf("Estimated mean creatine level for 101-year-olds: %.3f", mean_101))
+noquote(sprintf("Max age in sample population: %d", max(mri$age)))
+```
+
+Our sample population does include one individual close in age to the 101-year-olds we're trying to extrapolate our findings to. However, the scatterplot shows that the majority of individuals in our sample are <= 91 years old. Despite this, 101-year-olds are not vastly out of range, and this estimate is likely reliable for estimating the mean creatinine levels of this population. 
+
+#### g.	What is the interpretation of the intercept in your model? Does it have a relevant scientific interpretation?
+
+The intercept value ($\beta_0 = 0.648 mg/dl) can be interpreted as the estimated mean creatinine value for individuals with age = 0 - in other words, newborns. This estimate is unlikely to be relevant scientifically; our population has no individuals remotely close in age to newborns, and underlying biological processes governing creatinine are likely to be very different in infants. Our model should not be used to make any claims about this population of 0-year-olds. 
+
+#### h.	What is the interpretation of the slope?
+
+The slope parameter from the linear model estimates the average difference in mean creatinine level between populations one year of age apart.
+
+#### i.	Provide full statistical inference about an association between serum creatinine and age based on your regression model.
+
+From linear regression analysis using Huber-White estimates of the standard error, we estimate that for each year difference in age between two populations, blood creatine levels are 0.0056 mg/dl higher in the older population. A 95% CI suggests that this observation is not unusual if the true difference in mean creatinine levels were between 0.0005 and 0.011 mg/dl per year difference in age. The two-sided P value is $p = 0.032$; We reject the null hypothesis (using $\alpha = 0.05) that is no linear trend in the average creatinine level across age groups in elderly adults.
+
+#### j.	Suppose we wanted an estimate and a 95% CI for the difference in mean creatinine across groups that differ by 10 years in age. What would you report?
+
+Both the estimate and the 95% CI's scale linearly, so we could multiply the results from j) by 10 to get the estimates for groups differing by 10 years. Alternatively, we could scale our predictor variable age by a factor of 1/10 (basically converting it to decades) and re-run our analysis. 
+
+```{r, echo = FALSE}
+q2_lm2 <- regress("mean", crt~decades, data=mri)
+q2_lm2$coefficients[1:2, c(1,3,4,5,7)]
+```
+
+## Question 3
+*Now perform a regression analysis evaluating an association between serum creatinine levels and age by comparing the **geometric mean** of serum creatinine levels across groups defined by age as a continuous variable. In your analysis, allow for heteroscedasticity.  (Provide formal inference where asked to.)*
+
+#### a.	Provide a description of the statistical methods for the model you fit to address the question of an association between serum creatinine and age.
+
+To investigate the association between creatinine levels and age by comparing the geometric means across age groups, we would log-transform the response variable `crt`, which represents blood serum creatinine levels. A linear model fit to a log-transformed response provides inference on geometric means when the model parameters are exponentiated, and this is the approach we will take. We will conduct the regression analysis using robust standard error estimate calculated using the Huber-White sandwich method to allow for heteroscedasticity. 
+
+```{r, echo = FALSE}
+q3_lm1 <- regress("mean", crt_log ~ age, data=mri)
+q3_slope <- q3_lm1$coefficients[2,1]
+q3_intercept <- q3_lm1$coefficients[1,1]
+q3_95_l <- q3_lm1$coefficients[2,4]
+q3_95_u <- q3_lm1$coefficients[2,5]
+
+cint <- c(q3_slope, q3_95_l, q3_95_u)
+q3_percent_change <- 100*(exp(cint) - 1)
+q3_lm1$coefficients[1:2, c(1,3,4,5,7)]
+noquote(sprintf("%% Change Estimate: %.3f; 95%% CI: (%.3f, %.3f)", q3_percent_change[1], q3_percent_change[2], q3_percent_change[3]))
+
+```
+
+#### b.	Based on your regression model, what is the estimated geometric mean serum creatinine level among a population of 70 year old subjects, 80 year old subjects, and 90 year old subjects.
+
+```{r}
+geoMeanEst <- function(age) {
+  exp(q3_intercept + (q3_slope * age))
+}
+
+subjects <- data.table(age=c(60,70,80))
+subjects[,geomean_est:=geoMeanEst(age), by='age']
+subjects[,geomean_crt:=round(geomean_est, digits = 3)]
+subjects[,c(1,3)]
+```
+```{r, echo = FALSE}
+ggplot(data=mri) + geom_point(aes(age, crt_log)) + geom_abline(slope = q3_slope, intercept = q3_intercept, color='red')
+```
+#### c.	What is the interpretation of the intercept? Does it have a relevant scientific interpretation?
+
+The intercept, when exponentiated, represents the estimated geometric mean for populations of age == 0, or newborns. There is no useful scientific interpretation of this intercept, for similar reasons as mentioned in question 2. 
+
+#### d.	What is the interpretation of the slope? 
+
+When exponentiated, the slope represents the ratio of geometric means between two populations separated by 1 year of age. 
+
+#### e.	Provide full statistical inference about an association between serum creatinine and age based on your regression model
+
+After analyzing the association between age and blood serum creatinine levels using linear regression analysis on log-transformed creatinine levels using Huber-White estimates of the standard error, we estimate that for each additional year of age, the geometric mean of creatinine levels is 0.367 % higher.  A 95% CI suggests that this observation is not unusual if the true relationship between geometric means were such that the geometric mean in older individuals was between (-0.006 %, 0.742 %) higher for each year difference in age. Because the two-sided P value is 0.0539, we can not reject the null hypothesis at $\alpha = 0.05$ that no linear trend in average creatinine blood serum level exists across age groups. 
+
+#### f.	Provide an estimate and 95% confidence interval (CI) for the percent change in geometric mean serum creatinine between two groups that differ by 10 years in age.
+
+We can either transform the predictor and use decades as a predictor or take the slope/CIs from the previous part and raise them to the 10th power (since geometric means are multiplicative). 
+```{r, echo = FALSE}
+q3_lm2 <- regress("mean", crt_log ~ decades, data=mri)
+
+q3_slope2 <- q3_lm2$coefficients[2,1]
+q3_intercept2 <- q3_lm2$coefficients[1,1]
+q3_95_l2 <- q3_lm2$coefficients[2,4]
+q3_95_u2 <- q3_lm2$coefficients[2,5]
+
+cint <- c(q3_slope2, q3_95_l2, q3_95_u2)
+q3_percent_change2 <- 100*(exp(cint) - 1)
+noquote(sprintf("Estimate: %.3f; 95%% CI: (%.3f, %.3f)", q3_percent_change2[1], q3_percent_change2[2], q3_percent_change2[3]))
+```
+
+#### g.	Compare your estimates of geometric mean serum creatinine level in question (b) to estimates of (arithmetic) mean serum creatinine levels for 70, and 80, and 90 year old subject from a linear regression model with serum creatinine levels as the response and age as the predictor, e.g., the regression model for problem 2 above. Briefly discuss any similarities or differences.
+
+Despite having different interpretations, the two approaches are similar. The estimated creatinine levels are not far apart; however, the arithmetic mean analysis resulted in rejecting the null hypothesis, while this approach accepted it, despite both approaches resulting in p-values close to the 0.05 cutoff. 

@@ -36,6 +36,8 @@ To report results, you exponentiate the diff of log odds ==> Odds Ratio
 
 We exponentiate estimate +/- 1.96*SE ==> transform by exponentiatting. 
 
+The binomial family parameter tells the function to use logistic regression
+
 ```{r}
 mod2 <- glm(relapse24~nadirpsa, family='binomial', data=psa)
 
