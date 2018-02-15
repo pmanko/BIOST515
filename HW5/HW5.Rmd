@@ -1,0 +1,366 @@
+---
+title: "Homework 5"
+author: "Piotr Mankowski"
+date: "Winter 2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, eval = TRUE, results = 'hide')
+
+## load uwIntroStats
+require(uwIntroStats)
+library(data.table)
+```
+
+```{r q1}
+##############
+# Question 1
+##############
+
+## read-in data
+mri <- read.table("../../Datasets/mri.txt", header=TRUE)
+
+# create indicator for death within 5 years
+mri$death5 <- (mri$obstime < 5*365) & (mri$death == 1)
+
+# create indicators for high and low creatinine level
+mri$hi <- mri$crt > 1.2
+mri$lo <- mri$crt <= 1.2
+
+# logistic with death within 5 years as response
+# and high serum creatinine levels as predictor
+( fit1 <- regress("odds", death5 ~ hi, data = mri) )
+
+
+################
+# Question 1(c)
+################
+
+# odds/prob among lo crt
+
+# regression estimate of odds
+( odds.1c <- exp(coef(fit1)["(Intercept)", 1]) )
+
+# transform odds estimate to proportion
+( prob.1c <- odds.1c/(1+odds.1c) )
+
+
+################
+# Question 1(d)
+################
+
+# odds/prob among lo crt
+
+# sample estimate of proportion
+( prob.1d <- mean(subset(mri, lo == TRUE)$death5) )
+
+# transform proportion to odds
+( odds.1d <- prob.1d/(1-prob.1d) )
+
+# checking that the estimates are equal
+prob.1c - prob.1d
+odds.1c - odds.1d
+
+
+################
+# Question 1(e)
+################
+
+# odds/prob among hi crt
+
+# regression estimate of odds
+( odds.1e <- exp(coef(fit1)["(Intercept)", 1] + coef(fit1)["hiTRUE", 1]) )
+
+# transform odds estimate to proportion
+( prob.1e <- odds.1e/(1+odds.1e) )
+
+
+################
+# Question 1(f)
+################
+
+# odds/prob among hi crt
+
+# sample estimate of proportion
+( prob.1f <- mean(subset(mri, hi == TRUE)$death5) )
+
+# transform proportion to odds
+( odds.1f <- prob.1f/(1-prob.1f) )
+
+# checking that the estimates are equal
+prob.1e - prob.1f
+odds.1e - odds.1f
+
+
+################
+# Question 1(g)
+################
+
+# inference easiest based on transformed estimates
+# here e(Est) for hi gives the odds ratio
+
+fit1$transformed["hi", ]
+
+results.1g <- signif(fit1$transformed["hi", ], 3)
+
+
+################
+# Question 1(h)
+################
+
+fit1h <- regress("odds", death5 ~ lo, data = mri)
+fit1h$transformed["lo", ]
+
+
+################
+# Question 1(i)
+################
+
+fit1i <- regress("odds", I(!death5) ~ hi, data = mri)
+fit1i$transformed["hi", ]
+
+```
+
+# 1.   
+Perform a regression analysis for evaluating an association between serum creatinine level and 5 year all-cause mortality by comparing the odds of death within 5 years across groups defined by whether the subjects have "high" or "low" creatinine levels, where serum creatinine levels greater than 1.2 are considered to be "high", (i.e., "high" corresponds to  creatinine $>$ 1.2 mg/dl and "low" corresponds to creatinine $\leq$ 1.2 mg/dl ).  In your logistic regression model, use an indicator of death within 5 years as the  response, and an indicator of high serum creatinine level as the predictor. (Only provide a formal report of inference when asked to.)
+
+
+## a.    
+Is this a saturated regression model? Explain your answer.
+\
+**This is a saturated regression model. We have two groups defined by our predictor variable (high serum creatinine), and we are fitting a model with two parameters (a slope and an intercept).**
+
+
+## b.   
+Provide an interpretation of the slope and the intercept in your regression model in terms of the response variable (indicator of death within 5 years) and the predictor variable (high creatinine).
+\
+**In the raw model, the fitted intercept is the estimated log odds of death within five years post MRI among subjects with low serum creatinine, and the fitted slope is the estimate difference in log odds of death within five years between subjects with high serum creatinine and subjects with low serum creatinine. In the transformed (exponentiated) model, the fitted intercept is the estimated odds of death within five years post MRI among subjects with low serum creatinine, and the fitted slope is the estimated odds ratio for death within five years comparing subjects with high serum creatinine (in the numerator) to subjects with low serum creatinine (in the denominator).**
+
+
+## c.    
+From the logistic regression model, what is the estimated odds of dying within 5 years for subjects with low creatinine levels.   What is the estimated probability of dying within 5 years from the logistic regression model for subjects with low creatinine levels ? 
+\
+**The estimated odds of dying within 5 years for subjects with low serum creatinine are `r signif(odds.1c,3)`, and the corresponding estimated probability is `r signif(prob.1c,3)`**
+
+
+## d.   
+For the subset of subjects in the sample with low serum creatinine, calculate the proportion who died within 5 years. Also calculate the sample odds of dying within 5 years for subjects with low creatinine levels.  Compare the sample proportion and sample odds  to the corresponding estimates in part 1c from the logistic regression model? Briefly explain any similarities or differences.
+\
+**We obtain the same estimates using sample sample proportions and odds as we do via logistic regression because we have fit a saturated model.**
+
+
+## e.    
+From the logistic regression model, what is the estimated odds of dying within 5 years for subjects with high creatinine levels.   What is the estimated probability of dying within 5 years from the logistic regression model for subjects with high creatinine levels ? 
+\
+**The estimated odds of dying within 5 years for subjects with high serum creatinine are `r signif(odds.1e,3)`, and the corresponding estimated probability is `r signif(prob.1e,3)`.**
+
+
+## f.    
+For the subset of subjects in the sample with high creatinine levels, calculate the proportion who died within 5 years. Also calculate the sample odds of dying within 5 years for subjects with high creatinine levels.  Compare the sample proportions (or probabilities) and sample odds  to the corresponding estimates in part 1e from the logistic regression model? Briefly explain any similarities or differences.
+\
+**We obtain the same estimates using sample sample proportions and odds as we do via logistic regression because we have fit a saturated model.**
+
+
+## g.  
+Give full inference regarding an association  between 5 year all-cause mortality and serum creatinine levels from the logistic regression model with  indicator of death within 5 years as the response and indicator of high creatinine level as the predictor.  
+\
+**Methods: We assessed association between 5 year all-cause mortality and serum creatinine levels via logistic regression of 5 year vital status on serum creatinine dichotomized at 1.2 mg/dl (defined as high for all subjects above this level and as low for all other subjects) with Huber-White robust standard errors. We tested a null hypothesis of equal odds of 5-year mortality among subjects with high and low serum creatinine against the alternative of unequal odds using a Wald test with robust standard errors and defined significance as $p < 0.05$. We report a point estimate and 95\% Wald interval calculated with robust standard errors on the log odds scale for the odds ratio comparing 5-year mortality among subjects with high serum creatinine and low serum creatinine.**
+\
+\
+**Results: Based on logistic regression of 5-year vital status on serum creatinine level dichotomized at 1.2 mg/dl, we estimated that the odds ratio for death within five years among patients with serum creatinine above 1.2 mg/dl to 5-year survival among patients with serum creatinine less than or equal to 1.2 mg/dl is `r results.1g[1]`, with 95\% robust Wald confidence interval (`r results.1g[2]`, `r results.1g[3]`). A Wald test using robust standard errors of the null hypothesis of equal mortality in subjects with high and low serum creatinine against the general alternative returned p-value < .0001, so we find this association is significant at the 0.05 level and reject the null of no association between 5-year all-cause mortality and dichotomized serum creatinine level.**
+
+
+## h.   
+How would your answers to part b change if you were instead asked to fit a logistic regression model with indicator of death within 5 years as the response variable, but with indicator of low serum creatinine level as the predictor?  Would the statistical evidence for an association between 5 year mortality and serum creatinine levels change?  Briefly explain.
+\
+**The interpretations of the slope and intercept would change, as the intercept (in the transformed model) would now be estimated odds of death within 5 years for subjects with high serum creatinine and the slope would be the estimated odds ratio for death within 5 years comparing subjects with low serum creatinine (in the numerator) to subjects with high serum creatinine (in the denominator). However, the statistical evidence for association between 5-year mortality and serum creatinine levels would not change, as this model is just a reparameterization of the model we fit in 1b.**
+
+
+## i.  
+How would your answers to part b change if you were instead asked fit a logistic regression model with indicator of surviving at least 5 years as the response variable and  indicator of high creatinine level as the predictor?  Would the statistical evidence for an association between 5 year mortality and serum creatinine levels change?  Briefly explain. 
+\
+**The interpretations of the slope and intercept would change, as the intercept (in the transformed model) would now be estimated odds of surviving 5 years for subjects with low serum creatinine and the slope would be the estimated odds ratio for surviving 5 years comparing subjects with high serum creatinine (in the numerator) to subjects with low serum creatinine (in the denominator). However, the statistical evidence for association between 5-year mortality and serum creatinine levels would not change, as this model is again just a reparameterization of the model we fit in 1b.**
+
+*****
+
+## Question 1 code
+
+```{r, ref.label=c("q1"), echo=TRUE, eval=TRUE, results='markup'}
+```
+
+
+\newpage
+
+
+\newpage
+
+# 2.	
+In question 1, a prospective association analysis was conducted where we investigated differences in the distribution of death within 5 years across groups defined by serum creatinine level.  In this question, you will now conduct a retrospective analysis and fit a logistic regression model for the distribution of serum creatinine across groups defined by vital status at 5 years.  In your retrospective logistic regression model,  use an indicator for high serum creatinine level as the response, and indicator of death within 5 years as the predictor.  (Only provide a formal report of inference when asked to.)
+
+```{r q2a}
+#############
+# Question 2
+#############
+
+# logistic with death within 5 years as predictor
+# and high serum creatinine levels as response
+( fit2 <- regress("odds", hi ~ death5, data = mri) )
+
+```
+
+## a.	
+Provide an interpretation of the slope and the intercept in your regression model in terms of the response variable (indicator of high creatinine level) and the predictor variable (indicator of death within 5 years).  
+
+**The intercept in the regression model estimates the log odds of having high creatinine level among a group that was alive at 5 years. The slope estimates the log odds ratio of having high creatinine between a group that died within 5 years and an otherwise similar group that survived to at least 5 years.**
+
+**Equivalently, the exponentiated intercept estimates the odds of having high creatinine level among a group that was alive at 5 years. The exponentiated slope estimates the odds ratio of having high creatinine between a group that died within 5 years and an otherwise similar group that survived at least 5 years.**
+
+## b.	
+From the logistic regression model,  what is the estimated odds of high creatinine level for subjects who die within 5 years?   What is the estimated probability of having high  serum creatinine for subjects who die within 5 years.
+
+```{r q2b}
+################
+# Question 2(b)
+################
+
+# odds/prob among subjects dying within 5 years
+
+# regression estimate of odds
+( odds.2b <- exp(coef(fit2)["(Intercept)", 1] + coef(fit2)["death5TRUE", 1]) )
+
+# transform odds estimate to proportion
+( prob.2b <- odds.2b/(1+odds.2b) )
+
+```
+
+**From the logistic regression model, the estimated odds of high creatinine level for subjects who die within 5 years is `r sprintf("%0.4f", odds.2b)`. The corresponding estimated probability of having high serum creatinine for subjects who die within 5 years is `r sprintf("%0.4f", prob.2b)`.**
+
+**The odds were estimated by exponentiating the sum of the intercept and slope estimates from the logistic regression model. The probability estimate was obtained using the relationship $$probability = \frac{odds}{1+odds}.$$**
+
+## c.	
+From the logistic regression model, what is the estimated odds of having a high creatinine level for subjects who survive at least 5 years?   What is the estimated probability of having a high serum creatinine for subjects who survive at least 5 years.
+
+```{r q2c}
+################
+# Question 2(c)
+################
+
+# odds/prob among subjects dying within 5 years
+
+# regression estimate of odds
+( odds.2c <- exp(coef(fit2)["(Intercept)", 1]) )
+
+# transform odds estimate to proportion
+( prob.2c <- odds.2c/(1+odds.2c) )
+
+
+```
+
+**From the logistic regression model, the estimated odds of high creatinine level for subjects who survive at least 5 years is `r sprintf("%0.4f", odds.2c)`. The corresponding estimated probability of having high serum creatinine for subjects who survive at least 5 years is `r sprintf("%0.4f", prob.2c)`.**
+
+**The odds were estimated by exponentiating the intercept estimate from the logistic regression model. The probability estimate was obtained using the relationship $$probability = \frac{odds}{1+odds}.$$**
+
+
+## d.	
+Give full inference regarding an association  between 5 year all-cause mortality and serum creatinine levels from the logistic regression model with  indicator of high serum creatinine as the response and an indicator of death within 5 years as the predictor.  
+
+```{r q2d}
+################
+# Question 2(d)
+################
+
+# inference easiest based on transformed estimates
+# here e(Est) for death5 gives the odds ratio
+
+fit2$transformed["death5", ]
+
+round(fit2$transformed["death5", ], 4)
+
+```
+
+**Methods: To evaluate the potential association between serum creatinine level and 5 year all-cause mortality, we compare the odds of having "high" serum creatinine level across groups defined by vital status at 5 years. Here, "high" serum creatinine level is defined as creatinine > 1.2 mg/dl and "low" corresponds to creatinie $\leq 1.2$ md/dl. We fit a retrospective logistic regression model using an indicator for high serum creatinine level as the response and indicator of death within 5 years as the predictor. We report the estimated odds ratio of having high creatinine between a group that died within 5 years and an otherwise similar group that survived at least 5 years. To determine whether the odds ratio differs significantly from 1 (i.e. the odds are equal in both groups), we also report a 95% Wald confidence interval and p-value testing the hypothesis that the odds ratio is equal to 1.**
+
+**Results: From the restrospective logistic regression model, we estimate that the odds of having high serum creatinine are 2.3673 times higher in individuals that died within 5 years. The 95% confidence interval suggests this result would not be unusual for a true odds ratio of between 1.5519 to 3.6116 times higher in individuals that died within 5 years. The p-value for testing the null hypothesis that the odds ratio is equal to 1 was less than 0.05, so we reject the hypothesis. We find statistically significant evidence that there is an association between serum creatinine level and 5 year all-cause mortality.**
+
+## e.	
+Compare the association results in part 2d from the retrospective logistic model to the association results in part 1g from the prospective logistic regression model.  Briefly describe any similarities or differences.  
+
+```{r q2e}
+################
+# Question 2(e)
+################
+round(fit2$transformed["death5", ], 4)
+
+# compare to Question 1(g)
+
+round(fit1$transformed["hi", ], 4) # the same!
+
+```
+
+**The association results from parts 1g and 2d are identical. The F-statistics and p-values are exactly equal for the prospective and retrospective models. Furthermore, the prospective odds ratio estimate of 0.4224 and 95% confidence interval are the same as the retrospective odds ratio.**
+
+**This should not be unexpected, however. To see why this happened, consider the following simplified 2x2 table:**
+
+```{r, results = 'markup'}
+tab <- rbind(c("$a$", "$b$"), c("$c$", "$d$"))
+colnames(tab) <- c("Low", "High")
+row.names(tab) <- c("Dead", "Alive")
+knitr::kable(tab, row.names = TRUE)
+```
+
+**The prospective odds of Dead given High are $\frac{b}{d}$ and the prospective odds of Dead given Low are $\frac{a}{c}$. Hence, the prospective odds ratio is $\frac{b}{d} \div \frac{a}{c} = \frac{bc}{ad}$.**
+
+**The retrospective odds of High given Dead are $\frac{b}{a}$ and the retrospective odds of High given Alive are $\frac{d}{c}$. Hence the retrospective odds ratio is $\frac{b}{a} \div \frac{d}{c} = \frac{bc}{ad}$ and we see that this is mathematically equivalent to the prospective odds ratio!**
+
+
+
+*****
+
+## Question 2 code
+
+```{r, ref.label=c("q2a", "q2b", "q2c", "q2d", "q2e"), echo=TRUE, eval=TRUE, results='markup'}
+```
+
+\newpage
+
+# 3.
+
+Perform a regression analysis to evaluate an association between odds of death within 5 years and the continuous measure of serum creatinine levels (i.e., do not use a dichotomized variable for serum creatinine levels in this analysis).
+
+## a.
+
+Provide an interpretation of the slope and the intercept in your logistic regression model.
+
+**The intercept in the regression model estimates the log odds of death within 5 years among a hypothetical group that has zero serum creatinine level. The slope estimates the log odds ratio of death within 5 years for two groups whose difference in serum creatinine level is 1 mg/dL.**
+
+**Equivalently, the exponentiated intercept estimates the odds of death within 5 years among a hypothetical group that has zero serum creatinine level. The exponentiated slope estimates the odds ratio of death within 5 years for two groups whose difference in serum creatinine level is 1 mg/dL.**
+
+## b.
+
+Give full inference for an association between 5 year all-cause mortality and serum creatinine levels from your logistic regression model. 
+
+```{r q3b}
+
+#############
+# Question 3
+#############
+
+# logistic with death within 5 years as predictor
+# and serum creatinine levels as response (continuous)
+( fit3 <- regress("odds", death5 ~ crt, data = mri) )
+
+```
+
+\
+**Methods: We assessed the association between 5 year all-cause mortality and serum creatinine levels via logistic regression of 5 year vital status on serum creatinine with Huber-White robust standard errors. We tested a null hypothesis of equal odds of 5-year mortality among subjects with different serum creatinine against the alternative of unequal odds using a Wald test with robust standard errors and defined significance as $p < 0.05$. We report a point estimate and 95\% Wald interval calculated with robust standard errors on the log odds scale for the odds ratio comparing 5-year mortality among subjects with different serum creatinine.**
+\
+\
+**Results: Based on logistic regression of 5-year vital status on serum creatinine level, we estimated that the odds ratio for death within five years among patients whose serum creatinine differ by 1 mg/dL (higher serum creatinine divided by lower) is 5.986, with 95\% robust Wald confidence interval (3.116, 11.50). A Wald test using robust standard errors of the null hypothesis of equal mortality in subjects with different serum creatinine against the general alternative returned p-value < .0001, so we find this association is significant at the 0.05 level and reject the null of no association between 5-year all-cause mortality and serum creatinine level.**
+
+*****
+
+## Question 3 code
+
+```{r, ref.label=c("q3b"), echo=TRUE, eval=TRUE, results='markup'}
+```
