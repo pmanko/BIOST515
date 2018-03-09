@@ -6,183 +6,267 @@ output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, eval = TRUE, results = 'hide')
+knitr::opts_chunk$set(echo = FALSE, eval = TRUE, results = 'hide', warning=FALSE)
 
 ## load uwIntroStats
 require(uwIntroStats)
 library(data.table)
+library(ggplot2)
+library(measurements)
+
+## read-in data
+mri <- as.data.table(read.table("../data/mri.txt", header=TRUE, stringsAsFactors = FALSE))
+mri[, obstime_yr:=obstime/365]
+mri[, dead_at_5yr:=ifelse((obstime_yr <= 5.0 & death == 1), 1, 0), by='ptid']
+
+mri[,bmi:=(conv_unit(weight, "lbs", "kg")/conv_unit(height, "cm", "m")^2)]
 ```
+
+# Question 1
+**Perform a Poisson regression analysis to evaluate an association between 5 year all-cause mortality and creatinine by comparing the relative risk of death (or risk ratio of death) across groups defined by continuous serum creatinine level.  (Only provide a formal report of inference when asked to.)**
 
 ```{r q1}
 ##############
 # Question 1
 ##############
-
-## read-in data
-mri <- read.table("../../Datasets/mri.txt", header=TRUE)
-
-# create indicator for death within 5 years
-mri$death5 <- (mri$obstime < 5*365) & (mri$death == 1)
-
-# create indicators for high and low creatinine level
-mri$hi <- mri$crt > 1.2
-mri$lo <- mri$crt <= 1.2
-
-# logistic with death within 5 years as response
-# and high serum creatinine levels as predictor
-( fit1 <- regress("odds", death5 ~ hi, data = mri) )
-
-
-################
-# Question 1(c)
-################
-
-# odds/prob among lo crt
-
-# regression estimate of odds
-( odds.1c <- exp(coef(fit1)["(Intercept)", 1]) )
-
-# transform odds estimate to proportion
-( prob.1c <- odds.1c/(1+odds.1c) )
-
-
-################
-# Question 1(d)
-################
-
-# odds/prob among lo crt
-
-# sample estimate of proportion
-( prob.1d <- mean(subset(mri, lo == TRUE)$death5) )
-
-# transform proportion to odds
-( odds.1d <- prob.1d/(1-prob.1d) )
-
-# checking that the estimates are equal
-prob.1c - prob.1d
-odds.1c - odds.1d
-
-
-################
-# Question 1(e)
-################
-
-# odds/prob among hi crt
-
-# regression estimate of odds
-( odds.1e <- exp(coef(fit1)["(Intercept)", 1] + coef(fit1)["hiTRUE", 1]) )
-
-# transform odds estimate to proportion
-( prob.1e <- odds.1e/(1+odds.1e) )
-
-
-################
-# Question 1(f)
-################
-
-# odds/prob among hi crt
-
-# sample estimate of proportion
-( prob.1f <- mean(subset(mri, hi == TRUE)$death5) )
-
-# transform proportion to odds
-( odds.1f <- prob.1f/(1-prob.1f) )
-
-# checking that the estimates are equal
-prob.1e - prob.1f
-odds.1e - odds.1f
-
-
-################
-# Question 1(g)
-################
-
-# inference easiest based on transformed estimates
-# here e(Est) for hi gives the odds ratio
-
-fit1$transformed["hi", ]
-
-results.1g <- signif(fit1$transformed["hi", ], 3)
-
-
-################
-# Question 1(h)
-################
-
-fit1h <- regress("odds", death5 ~ lo, data = mri)
-fit1h$transformed["lo", ]
-
-
-################
-# Question 1(i)
-################
-
-fit1i <- regress("odds", I(!death5) ~ hi, data = mri)
-fit1i$transformed["hi", ]
+mod1 <- regress("rate", dead_at_5yr ~ crt, data=mri)
 
 ```
 
-# 1.   
-Perform a regression analysis for evaluating an association between serum creatinine level and 5 year all-cause mortality by comparing the odds of death within 5 years across groups defined by whether the subjects have "high" or "low" creatinine levels, where serum creatinine levels greater than 1.2 are considered to be "high", (i.e., "high" corresponds to  creatinine $>$ 1.2 mg/dl and "low" corresponds to creatinine $\leq$ 1.2 mg/dl ).  In your logistic regression model, use an indicator of death within 5 years as the  response, and an indicator of high serum creatinine level as the predictor. (Only provide a formal report of inference when asked to.)
-
-
-## a.    
-Is this a saturated regression model? Explain your answer.
+## a. 
+*Provide an interpretation of the slope and the intercept in the Poisson regression model, and include the numerical values of the slope and intercept in your interpretation.*
 \
-**This is a saturated regression model. We have two groups defined by our predictor variable (high serum creatinine), and we are fitting a model with two parameters (a slope and an intercept).**
+The intercept of the model is $-2.860$; When exponentiated, this intercept equals $0.0573$. This intercept represents the estimated rate of 5-year all-cause mortality for a population where serum creatine levels $= 0$. 
 
+The slope of the model is $0.942$. The exponentiated slope of $2.56$ represents the estimated ratio of rates of 5-year mortality between populations differing by one unit of blood creatinine.
 
 ## b.   
-Provide an interpretation of the slope and the intercept in your regression model in terms of the response variable (indicator of death within 5 years) and the predictor variable (high creatinine).
+*Give full inference for an association  between 5 year all-cause mortality and serum creatinine levels from the Poisson regression model. *
 \
-**In the raw model, the fitted intercept is the estimated log odds of death within five years post MRI among subjects with low serum creatinine, and the fitted slope is the estimate difference in log odds of death within five years between subjects with high serum creatinine and subjects with low serum creatinine. In the transformed (exponentiated) model, the fitted intercept is the estimated odds of death within five years post MRI among subjects with low serum creatinine, and the fitted slope is the estimated odds ratio for death within five years comparing subjects with high serum creatinine (in the numerator) to subjects with low serum creatinine (in the denominator).**
+**Methods:** We assessed the association between 5-year all-cause mortality and serum creatinine levels using a Poisson regression model. We tested a null hypothesis that the rate of death does not vary across creatine levels against the alternative that an association exists between serum creatinine and 5-year-mortality (meaning the slope != 1) using the defined significance of $p < 0.05$. We report a point estimate and 95\% Confidence Interval. 
+
+\
+**Results:** Based on the Poisson regression of 5-year vital status on serum creatinine level, we estimate that the rate for death within five years increases around 156\% higher for each 1 mg/dl difference in creatinine serum levels. The 95\% confidence interval of the point estimate suggests that our observation would not be unusual if the true percent increase in the rate of 5-year mortality were between 194\% and 239\%. This increase is highly significant at the 0.05 level, since the test of the null hypothesis that no association exists between 5-year mortality and serum creatine levels (aka the exponentiated slope == 1) against the general alternative returned a p-value of < 0.00005, suggesting we can reject the null hypothesis. 
 
 
 ## c.    
-From the logistic regression model, what is the estimated odds of dying within 5 years for subjects with low creatinine levels.   What is the estimated probability of dying within 5 years from the logistic regression model for subjects with low creatinine levels ? 
+*Compare the association results in part b that are based on risk ratios to using a logistic regression  model where odds ratios of death within 5 years are used as the summary measure for an association  with serum creatinine level (i.e., question 3 in homework 4).    Briefly describe any similarities or differences in the association results.*
 \
-**The estimated odds of dying within 5 years for subjects with low serum creatinine are `r signif(odds.1c,3)`, and the corresponding estimated probability is `r signif(prob.1c,3)`**
 
-
-## d.   
-For the subset of subjects in the sample with low serum creatinine, calculate the proportion who died within 5 years. Also calculate the sample odds of dying within 5 years for subjects with low creatinine levels.  Compare the sample proportion and sample odds  to the corresponding estimates in part 1c from the logistic regression model? Briefly explain any similarities or differences.
-\
-**We obtain the same estimates using sample sample proportions and odds as we do via logistic regression because we have fit a saturated model.**
-
-
-## e.    
-From the logistic regression model, what is the estimated odds of dying within 5 years for subjects with high creatinine levels.   What is the estimated probability of dying within 5 years from the logistic regression model for subjects with high creatinine levels ? 
-\
-**The estimated odds of dying within 5 years for subjects with high serum creatinine are `r signif(odds.1e,3)`, and the corresponding estimated probability is `r signif(prob.1e,3)`.**
-
-
-## f.    
-For the subset of subjects in the sample with high creatinine levels, calculate the proportion who died within 5 years. Also calculate the sample odds of dying within 5 years for subjects with high creatinine levels.  Compare the sample proportions (or probabilities) and sample odds  to the corresponding estimates in part 1e from the logistic regression model? Briefly explain any similarities or differences.
-\
-**We obtain the same estimates using sample sample proportions and odds as we do via logistic regression because we have fit a saturated model.**
-
-
-## g.  
-Give full inference regarding an association  between 5 year all-cause mortality and serum creatinine levels from the logistic regression model with  indicator of death within 5 years as the response and indicator of high creatinine level as the predictor.  
-\
-**Methods: We assessed association between 5 year all-cause mortality and serum creatinine levels via logistic regression of 5 year vital status on serum creatinine dichotomized at 1.2 mg/dl (defined as high for all subjects above this level and as low for all other subjects) with Huber-White robust standard errors. We tested a null hypothesis of equal odds of 5-year mortality among subjects with high and low serum creatinine against the alternative of unequal odds using a Wald test with robust standard errors and defined significance as $p < 0.05$. We report a point estimate and 95\% Wald interval calculated with robust standard errors on the log odds scale for the odds ratio comparing 5-year mortality among subjects with high serum creatinine and low serum creatinine.**
-\
-\
-**Results: Based on logistic regression of 5-year vital status on serum creatinine level dichotomized at 1.2 mg/dl, we estimated that the odds ratio for death within five years among patients with serum creatinine above 1.2 mg/dl to 5-year survival among patients with serum creatinine less than or equal to 1.2 mg/dl is `r results.1g[1]`, with 95\% robust Wald confidence interval (`r results.1g[2]`, `r results.1g[3]`). A Wald test using robust standard errors of the null hypothesis of equal mortality in subjects with high and low serum creatinine against the general alternative returned p-value < .0001, so we find this association is significant at the 0.05 level and reject the null of no association between 5-year all-cause mortality and dichotomized serum creatinine level.**
-
-
-## h.   
-How would your answers to part b change if you were instead asked to fit a logistic regression model with indicator of death within 5 years as the response variable, but with indicator of low serum creatinine level as the predictor?  Would the statistical evidence for an association between 5 year mortality and serum creatinine levels change?  Briefly explain.
-\
-**The interpretations of the slope and intercept would change, as the intercept (in the transformed model) would now be estimated odds of death within 5 years for subjects with high serum creatinine and the slope would be the estimated odds ratio for death within 5 years comparing subjects with low serum creatinine (in the numerator) to subjects with high serum creatinine (in the denominator). However, the statistical evidence for association between 5-year mortality and serum creatinine levels would not change, as this model is just a reparameterization of the model we fit in 1b.**
-
-
-## i.  
-How would your answers to part b change if you were instead asked fit a logistic regression model with indicator of surviving at least 5 years as the response variable and  indicator of high creatinine level as the predictor?  Would the statistical evidence for an association between 5 year mortality and serum creatinine levels change?  Briefly explain. 
-\
-**The interpretations of the slope and intercept would change, as the intercept (in the transformed model) would now be estimated odds of surviving 5 years for subjects with low serum creatinine and the slope would be the estimated odds ratio for surviving 5 years comparing subjects with high serum creatinine (in the numerator) to subjects with low serum creatinine (in the denominator). However, the statistical evidence for association between 5-year mortality and serum creatinine levels would not change, as this model is again just a reparameterization of the model we fit in 1b.**
+The odds ratio estimate for the logistic regression in HW 4 was found to be 5.986, with a 95% CI of (3.116, 11.50). Using the Poisson regression, we found the risk ratio estimate to be 2.564, with a 95% CI of (1.938, 3.392). Both results suggest a highly significant, positive association between serum creatinine levels and 5-year mortality; they only differ in the interpretation of the point estimate. A Poisson regression allows inference on risk ratios, while the logistic regression allows inference on odds ratios. 
 
 *****
+\newpage
+
+
+```{r q2}
+#############
+# Question 2
+#############
+
+```
+
+# Question 2	
+**Questions 3 and 4 below investigate associations between serum cholesterol level, age, sex, and body mass index (BMI).  In this question we will obtain some summary statistics for these variables.**
+
+## a.	
+*Create a variable for BMI using the height and weight measurements on the subjects.  [Hint: Make sure that appropriate conversions of the weight and height measures are used in the calculation of BMI].  Provide a figure illustrating the distribution of BMI in the sample.*
+\
+
+```{r q2a, echo=F}
+ggplot(mri, aes(x=bmi)) + geom_histogram(aes(y=..density..), binwidth=.5, colour="black", fill="white") +
+geom_density(alpha=.2, fill="#FF6666") + ggtitle("Distribution of BMI for MRI Subjects")
+```
+
+##b.	
+*Provide suitable descriptive statistics for serum creatinine levels, age, sex, and BMI.*
+
+```{r q2b, echo=F, eval=T}
+# function to summarize continuous variables
+cont.summary <- function(x, digits=1){
+  fmt <- paste0("%0.", digits, "f")
+  m <- mean(x, na.rm = TRUE)
+  m <- sprintf(fmt = fmt, m)
+  s <- sd(x, na.rm = TRUE)
+  s <- sprintf(fmt = fmt, s)
+  mini <- round(min(x, na.rm = TRUE), digits=digits)
+  maxi <- round(max(x, na.rm = TRUE), digits=digits)
+  paste0(m, " (", s, "); ", mini, "-", maxi)
+}
+
+# function to summarize discrete variables
+disc.summary <- function(x, digits=1){
+  fmt <- paste0("%0.", digits, "f")
+  pct <- mean(x, na.rm = TRUE) * 100
+  pct <- sprintf(fmt = fmt, pct)
+  paste0(pct, "%")
+}
+
+# names of continuous variables
+cont.covars <- c("age", "crt", "bmi")
+disc.covars <- c()
+
+tab1col1 <- c(
+  paste0("n = ", length(mri[mri$male == 0,]$ptid)),
+  apply(mri[male == 0, cont.covars, with=FALSE], 2, cont.summary)
+  # apply(mri[male == 0, disc.covars, with=FALSE], 2, disc.summary)
+)
+
+tab1col2 <- c(
+  paste0("n = ", length(mri[mri$male == 1,]$ptid)),
+  apply(mri[male == 1, cont.covars, with=FALSE], 2, cont.summary)
+  #  apply(mri[male == 1, disc.covars, with=FALSE], 2, disc.summary)
+)
+
+tab1col3 <- c(
+  paste0("n = ", length(mri$ptid)),
+  apply(mri[, cont.covars, with=FALSE], 2, cont.summary)
+  # apply(mri[, disc.covars, with=FALSE], 2, disc.summary)
+)
+
+tab1names <- c(
+  "Sample size",
+  "Age (years)^1^",
+  "Serum Creatinine Levels (mg/dl)^1^",
+  "BMI (kg/m^2^)^1^"
+  )
+
+tab1 <- cbind(tab1names, tab1col1, tab1col2, tab1col3)
+tab1col.names <- c("Variable", "Females", "Males", "All subjects")
+
+```
+
+```{r tab1, echo=FALSE, eval=TRUE, results='markup'}
+knitr::kable(tab1, row.names = FALSE, col.names = tab1col.names)
+```
+\
+**^1^ mean (sd); min-max are reported**
+
+*****
+\newpage
+
+```{r q3}
+
+#############
+# Question 3
+#############
+
+```
+
+# Question 3
+**We are interested in examining how mean serum creatinine levels vary by BMI and sex. In the questions below, you do not need to provide full statistical inference. Instead, just answer the following questions.**
+
+## a.	
+*Create a scatterplot of serum creatinine levels versus BMI.  Use different symbols and/or colors for each sex group, and include LOWESS  (or LOESS) curves for each sex group.*
+
+```{r q3a, echo=F}
+mri[,malef:=as.factor(male)]
+ggplot(mri, aes(x=bmi, y=crt, color=malef, shape=malef, fill=malef)) + geom_point() + geom_smooth()
+
+```
+
+## b.	
+*What observations do you make from the scatterplot in part a regarding the association between serum creatinine levels and BMI?*
+
+Disregarding the values for BMI < 17 and BMI > 40 due to the sparseness of the data, the association between serum creatinine levels and BMI seems to be almost non-existant. For males, the Lowess line seems to have a slope of around 0 across the whole applicable range. For females, there does seem to be a very slight positive association between BMI and creatinine levels, since the slope of the Lowess line looks slightly positive. 
+
+## c.	
+*Is there evidence from descriptive statistics (question 2) and the scatterplot in part a that sex modifies the association between serum creatinine level and BMI? Explain your reasoning.*
+There does not seem to be evidence for sex modifying the association between serum creatinine and BMI. The Lowess lines for both males and females both have a slope of around 0; Sex does not seem to affect this slope. Although serum creatinine levels seem to be higher in males than females (as evidenced by the summary statistics and the fact that the Lowess line for males is higher than for females), the association between BMI and crt in each group seems to be simmilar. 
+
+## d.	
+*Is there evidence from descriptive statistics (question 1) and the scatterplot in part a that sex confounds the association between serum creatinine level and BMI? Explain your reasoning.*
+
+There does not seem to be evidence for sex confounding the association between serum creatinine and BMI.  For sex to confound this association, sex must be associated with both BMI and crt. The BMI values for males and females seem to be simmilar (based on the descriptive statistics). Although sex does seem to affect crt levels, with males having higher serum creatinine, this is not enough to suggest that sex confounds the association between BMI and creatinine. 
+
+## e.	
+*Perform an analysis to determine whether mean serum creatinine levels differ across sex groups. Briefly describe the analysis that you performed and clearly state the basis of your conclusion regarding an association.*
+
+```{r q3e}
+mod3e <- regress('mean', crt~male, data=mri)
+
+```
+After performing a linear regression of creatinine on sex using robust SE, we do find evidence for mean creatinine levels differing across sex groups. The slope is estimated to be $0.269$, suggesting creatinine levels in males are on average $0.269 mg/dl$ higher than in females; with a p-value of <0.00005, this result is highly significant at $\alpha = 0.05$. 
+
+## f.	
+*Perform an analysis to determine whether there is a linear trend in mean serum creatinine levels by BMI. Briefly describe the analysis that you performed and clearly state the basis of your conclusion regarding an association.*
+
+```{r q3f }
+mod3f <- regress('mean', crt~bmi, data=mri)
+```
+
+There does not seem to be a significant linear trend in mean serum creatinine levels by BMI. A linear regression of creatinine levels on BMI gives a slope estimate of $0.00319$, which is close to 0. The 95% CI of the slope includes 0, and the p-value for the hypothesis test of whether this slope differs from 0 has a p-value of $0.311$, suggesting a lack of evidence for this linear trend at $\alpha = 0.05$. 
+
+## g.	
+*Perform an analysis to determine whether mean serum creatinine levels differ across sex groups after adjustment for BMI. Briefly describe the analysis that you performed and clearly state the basis of your conclusion regarding an association.*
+
+```{r q3g }
+mod3g <- regress('mean', crt~male+bmi, data=mri)
+```
+
+After performing a multivariate regression of creatinine levels on sex adjusted for bmi, we find that the estimated difference in creeatinine between males and females with similar bmi is $0.270 mg/dl$; this result is highly significant at $\alpha = 0.05$, with the p-value = < 0.0005, suggesting mean creatinine levels are higher in males than in females after adjusting for bmi. 
+
+## h.	
+*Perform an analysis to determine whether there is a linear trend in mean serum creatinine levels by BMI after adjustment for sex. Briefly describe the analysis that you performed and clearly state the basis of your conclusion regarding an association.*
+
+Using the same mulitvariate linear regression as in part g, we do not find evidence for a linear trend in mean creatinine levels by BMI after adjusting for sex. The estimated difference in mean creatinine levels for two populations with the same sex but with a 1 kg/m^2^ difference in BMI is $0.00381$, which is close to 0. The hypothesis test of whether this difference is not 0 has a p-value of $0.193$, which means we cannot reject the null hypothesis at $\alpha = 0.05$. 
+
+## i.	
+*Perform an analysis to determine if sex modifies the association between mean serum creatinine levels and BMI.  Briefly describe the analysis that you performed and clearly state the basis of your conclusion regarding an association.*
+
+Since the adjusted for sex(part h) and unajusted for sex(part f) analyses of the association between mean serum creatinine levels and BMI have similar results, there does not seem to be evidence for sex modifying this association.
+
+## j.	
+*How would you summarize the association between serum creatinine levels and BMI and sex? Provide a summary of your findings that is suitable for inclusion in a manuscript.*
+
+We examined the association between serum creatinine levels and bmi and sex by performing a multivariate linear regression using Huber-White robust standard errors. We tested the null hypotheses that creatinine levels do not vary with BMI and sex at the significance level of $0.05$. 
+\
+
+We found that mean creatinine levels for popluations of males and females with teh same bmi differ by an estimated value of $0.270 mg/dl$, with males having the higher level; this estimate has a confidence interval of $(0.2305, 0.3087)$. We reject the null hypothesis that no difference exists between males and females of the same bmi, since our p-value is $<0.0005$. 
+
+We estimate the difference in creatinine levels for populations of the same sex but varying in BMI by 1 kg/m^2^ to be $0.00382 mg/dl$, where higher bmi populations have higher creatinine levels. This estimate has a 95\% confidence interval of (-0.00193, 0.00958). We cannot reject the null hypothesis of no association between creatinine levels and bmi when adjusted for sex, since the p-value equals $0.1929$. 
+
+******
+\newpage
+
+```{r q4}
+
+#############
+# Question 4
+#############
+
+mod4 <- regress("mean", crt~age+male+bmi, data=mri)
+
+```
+
+# Question 4
+**4.	Now consider a multivariate linear regression analysis with serum creatinine level as the response and the variables age, sex, and BMI as predictors.**
+
+## a.	
+*Provide an interpretation of the intercept in the regression model. Is the intercept estimate scientifically useful?*
+
+The intercept for this multivariate linear regression is $0.355$. This intercept represents the estimated mean creatinine level for a population where the predictors are all 0: newborn females who have a bmi of 0. This theoretical population does not exist, and this estimate has no real scientific value. 
+
+## b.	
+*Give full inference for the age slope in the regression model.*
+
+We assessed the association between serum creatinine levels and age, adjusted for bmi and sex, by perfoming a a multivariate linear regression with Huber-White robust standard errors. We tested the null hypothesis that no difference in mean creatinine levels exists for different ages using a  defined significance as $p < 0.05$. We report a point estimate and 95\% confidence interval calculated with robust standard errors. Based on this analysis, we estimate the difference in mean creatinine levels between populations one year apart and with the same sex and bmi to be $0.00582 md/dl$, with the older population having higher creatinine levels, and a 95% confidence interval of (0.00140, 0.01024). We reject the null hypothesis at the $0.05$ significance level, since the p-value for the hypothesis test is $0.0099$. Age controlled for bmi and sex has a slight positive association with creatinine levels.
+
+
+## c.	
+*Give full inference for the sex slope in the regression model.*
+
+We assessed the association between serum creatinine levels and sex, adjusted for bmi and age, by perfoming a a multivariate linear regression with Huber-White robust standard errors. We tested the null hypothesis that no difference in mean creatinine levels exists for males and females of the same bmi and age using a defined significance as $p < 0.05$. We report a point estimate and 95\% confidence interval calculated with robust standard errors. Based on this analysis, we estimate the difference in mean creatinine levels between populations of males and females of the same age and bmi to be $0.268 mg/dl$, with males having the higher creatinine. The 95% confidence interval for this estimate is of $(0.00140 mg/dl, 0.01024 mg/dl)$. We reject the null hypothesis at the $0.05$ significance level, since the p-value for the hypothesis test is $< 0.0005$. Creatinine levels and sex have a postivive association when controlled for bmi and age.
+
+## d.	
+*Give full inference for the BMI slope in the regression model.*
+
+We assessed the association between serum creatinine levels and bmi, adjusted for sex and age, by perfoming a a multivariate linear regression with Huber-White robust standard errors. We tested the null hypothesis that no difference in mean creatinine levels exists populations of the same bmi and age using a defined significance as $p < 0.05$. We report a point estimate and 95\% confidence interval calculated with robust standard errors. Based on this analysis, we estimate the difference in mean creatinine levels between populations 1 kg/m^2^ apart with the same age and sex to be $0.00536 mg/dl$, with the higher bmi group having the higher creatinine. The 95% confidence interval for this estimate is of $(-6.44e-05, 0.0108)$. We cannot reject the null hypothesis at the $0.05$ significance level, since the p-value for the hypothesis test is $0.0528$. Creatinine levels and bmi do not have a significant association.
+
+
+
+*****
+\newpage
 
 ## Question 1 code
 
@@ -190,177 +274,18 @@ How would your answers to part b change if you were instead asked fit a logistic
 ```
 
 
-\newpage
-
-
-\newpage
-
-# 2.	
-In question 1, a prospective association analysis was conducted where we investigated differences in the distribution of death within 5 years across groups defined by serum creatinine level.  In this question, you will now conduct a retrospective analysis and fit a logistic regression model for the distribution of serum creatinine across groups defined by vital status at 5 years.  In your retrospective logistic regression model,  use an indicator for high serum creatinine level as the response, and indicator of death within 5 years as the predictor.  (Only provide a formal report of inference when asked to.)
-
-```{r q2a}
-#############
-# Question 2
-#############
-
-# logistic with death within 5 years as predictor
-# and high serum creatinine levels as response
-( fit2 <- regress("odds", hi ~ death5, data = mri) )
-
-```
-
-## a.	
-Provide an interpretation of the slope and the intercept in your regression model in terms of the response variable (indicator of high creatinine level) and the predictor variable (indicator of death within 5 years).  
-
-**The intercept in the regression model estimates the log odds of having high creatinine level among a group that was alive at 5 years. The slope estimates the log odds ratio of having high creatinine between a group that died within 5 years and an otherwise similar group that survived to at least 5 years.**
-
-**Equivalently, the exponentiated intercept estimates the odds of having high creatinine level among a group that was alive at 5 years. The exponentiated slope estimates the odds ratio of having high creatinine between a group that died within 5 years and an otherwise similar group that survived at least 5 years.**
-
-## b.	
-From the logistic regression model,  what is the estimated odds of high creatinine level for subjects who die within 5 years?   What is the estimated probability of having high  serum creatinine for subjects who die within 5 years.
-
-```{r q2b}
-################
-# Question 2(b)
-################
-
-# odds/prob among subjects dying within 5 years
-
-# regression estimate of odds
-( odds.2b <- exp(coef(fit2)["(Intercept)", 1] + coef(fit2)["death5TRUE", 1]) )
-
-# transform odds estimate to proportion
-( prob.2b <- odds.2b/(1+odds.2b) )
-
-```
-
-**From the logistic regression model, the estimated odds of high creatinine level for subjects who die within 5 years is `r sprintf("%0.4f", odds.2b)`. The corresponding estimated probability of having high serum creatinine for subjects who die within 5 years is `r sprintf("%0.4f", prob.2b)`.**
-
-**The odds were estimated by exponentiating the sum of the intercept and slope estimates from the logistic regression model. The probability estimate was obtained using the relationship $$probability = \frac{odds}{1+odds}.$$**
-
-## c.	
-From the logistic regression model, what is the estimated odds of having a high creatinine level for subjects who survive at least 5 years?   What is the estimated probability of having a high serum creatinine for subjects who survive at least 5 years.
-
-```{r q2c}
-################
-# Question 2(c)
-################
-
-# odds/prob among subjects dying within 5 years
-
-# regression estimate of odds
-( odds.2c <- exp(coef(fit2)["(Intercept)", 1]) )
-
-# transform odds estimate to proportion
-( prob.2c <- odds.2c/(1+odds.2c) )
-
-
-```
-
-**From the logistic regression model, the estimated odds of high creatinine level for subjects who survive at least 5 years is `r sprintf("%0.4f", odds.2c)`. The corresponding estimated probability of having high serum creatinine for subjects who survive at least 5 years is `r sprintf("%0.4f", prob.2c)`.**
-
-**The odds were estimated by exponentiating the intercept estimate from the logistic regression model. The probability estimate was obtained using the relationship $$probability = \frac{odds}{1+odds}.$$**
-
-
-## d.	
-Give full inference regarding an association  between 5 year all-cause mortality and serum creatinine levels from the logistic regression model with  indicator of high serum creatinine as the response and an indicator of death within 5 years as the predictor.  
-
-```{r q2d}
-################
-# Question 2(d)
-################
-
-# inference easiest based on transformed estimates
-# here e(Est) for death5 gives the odds ratio
-
-fit2$transformed["death5", ]
-
-round(fit2$transformed["death5", ], 4)
-
-```
-
-**Methods: To evaluate the potential association between serum creatinine level and 5 year all-cause mortality, we compare the odds of having "high" serum creatinine level across groups defined by vital status at 5 years. Here, "high" serum creatinine level is defined as creatinine > 1.2 mg/dl and "low" corresponds to creatinie $\leq 1.2$ md/dl. We fit a retrospective logistic regression model using an indicator for high serum creatinine level as the response and indicator of death within 5 years as the predictor. We report the estimated odds ratio of having high creatinine between a group that died within 5 years and an otherwise similar group that survived at least 5 years. To determine whether the odds ratio differs significantly from 1 (i.e. the odds are equal in both groups), we also report a 95% Wald confidence interval and p-value testing the hypothesis that the odds ratio is equal to 1.**
-
-**Results: From the restrospective logistic regression model, we estimate that the odds of having high serum creatinine are 2.3673 times higher in individuals that died within 5 years. The 95% confidence interval suggests this result would not be unusual for a true odds ratio of between 1.5519 to 3.6116 times higher in individuals that died within 5 years. The p-value for testing the null hypothesis that the odds ratio is equal to 1 was less than 0.05, so we reject the hypothesis. We find statistically significant evidence that there is an association between serum creatinine level and 5 year all-cause mortality.**
-
-## e.	
-Compare the association results in part 2d from the retrospective logistic model to the association results in part 1g from the prospective logistic regression model.  Briefly describe any similarities or differences.  
-
-```{r q2e}
-################
-# Question 2(e)
-################
-round(fit2$transformed["death5", ], 4)
-
-# compare to Question 1(g)
-
-round(fit1$transformed["hi", ], 4) # the same!
-
-```
-
-**The association results from parts 1g and 2d are identical. The F-statistics and p-values are exactly equal for the prospective and retrospective models. Furthermore, the prospective odds ratio estimate of 0.4224 and 95% confidence interval are the same as the retrospective odds ratio.**
-
-**This should not be unexpected, however. To see why this happened, consider the following simplified 2x2 table:**
-
-```{r, results = 'markup'}
-tab <- rbind(c("$a$", "$b$"), c("$c$", "$d$"))
-colnames(tab) <- c("Low", "High")
-row.names(tab) <- c("Dead", "Alive")
-knitr::kable(tab, row.names = TRUE)
-```
-
-**The prospective odds of Dead given High are $\frac{b}{d}$ and the prospective odds of Dead given Low are $\frac{a}{c}$. Hence, the prospective odds ratio is $\frac{b}{d} \div \frac{a}{c} = \frac{bc}{ad}$.**
-
-**The retrospective odds of High given Dead are $\frac{b}{a}$ and the retrospective odds of High given Alive are $\frac{d}{c}$. Hence the retrospective odds ratio is $\frac{b}{a} \div \frac{d}{c} = \frac{bc}{ad}$ and we see that this is mathematically equivalent to the prospective odds ratio!**
-
-
-
-*****
-
 ## Question 2 code
 
-```{r, ref.label=c("q2a", "q2b", "q2c", "q2d", "q2e"), echo=TRUE, eval=TRUE, results='markup'}
+```{r, ref.label=c("q2a", "q2b"), echo=TRUE, eval=TRUE, results='markup'}
 ```
 
-\newpage
-
-# 3.
-
-Perform a regression analysis to evaluate an association between odds of death within 5 years and the continuous measure of serum creatinine levels (i.e., do not use a dichotomized variable for serum creatinine levels in this analysis).
-
-## a.
-
-Provide an interpretation of the slope and the intercept in your logistic regression model.
-
-**The intercept in the regression model estimates the log odds of death within 5 years among a hypothetical group that has zero serum creatinine level. The slope estimates the log odds ratio of death within 5 years for two groups whose difference in serum creatinine level is 1 mg/dL.**
-
-**Equivalently, the exponentiated intercept estimates the odds of death within 5 years among a hypothetical group that has zero serum creatinine level. The exponentiated slope estimates the odds ratio of death within 5 years for two groups whose difference in serum creatinine level is 1 mg/dL.**
-
-## b.
-
-Give full inference for an association between 5 year all-cause mortality and serum creatinine levels from your logistic regression model. 
-
-```{r q3b}
-
-#############
-# Question 3
-#############
-
-# logistic with death within 5 years as predictor
-# and serum creatinine levels as response (continuous)
-( fit3 <- regress("odds", death5 ~ crt, data = mri) )
-
-```
-
-\
-**Methods: We assessed the association between 5 year all-cause mortality and serum creatinine levels via logistic regression of 5 year vital status on serum creatinine with Huber-White robust standard errors. We tested a null hypothesis of equal odds of 5-year mortality among subjects with different serum creatinine against the alternative of unequal odds using a Wald test with robust standard errors and defined significance as $p < 0.05$. We report a point estimate and 95\% Wald interval calculated with robust standard errors on the log odds scale for the odds ratio comparing 5-year mortality among subjects with different serum creatinine.**
-\
-\
-**Results: Based on logistic regression of 5-year vital status on serum creatinine level, we estimated that the odds ratio for death within five years among patients whose serum creatinine differ by 1 mg/dL (higher serum creatinine divided by lower) is 5.986, with 95\% robust Wald confidence interval (3.116, 11.50). A Wald test using robust standard errors of the null hypothesis of equal mortality in subjects with different serum creatinine against the general alternative returned p-value < .0001, so we find this association is significant at the 0.05 level and reject the null of no association between 5-year all-cause mortality and serum creatinine level.**
-
-*****
 
 ## Question 3 code
 
-```{r, ref.label=c("q3b"), echo=TRUE, eval=TRUE, results='markup'}
+```{r, ref.label=c("q3a", "q3e", "q3f", "q3g"), echo=TRUE, eval=TRUE, results='markup'}
+```
+
+## Question 4 code
+
+```{r, ref.label=c("q4"), echo=TRUE, eval=TRUE, results='markup'}
 ```

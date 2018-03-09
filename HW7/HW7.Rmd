@@ -1,0 +1,334 @@
+---
+title: "Homework 7"
+author: "Piotr Mankowski"
+date: "March 2, 2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, results = 'hide', warning = FALSE)
+
+require(uwIntroStats)
+library(ggplot2)
+library(data.table)
+
+mri <- as.data.table(read.table("../data/mri.txt", header = TRUE))
+mri[, obstime_yr:=obstime/365]
+mri[, dead_at_5yr:=ifelse((obstime_yr <= 5.0 & death == 1), 1, 0), by='ptid']
+mri[, white:=as.integer(race == 1)]
+mri[, smoked:=as.integer(packyrs > 0)]
+```
+
+# 1.	
+*Suppose we are interested in evaluating associations with all-cause mortality using a logistic regression model.  Perform a logistic regression analysis with indicator of death within 5 years of study enrollment as the response and with creatinine, age, indicator for ever smoked, and indicator of white race as predictors.*
+
+```{r q1}
+q1data <- mri[!is.na(crt)]
+mod1 <- regress("odds", dead_at_5yr ~ crt + age + smoked + white, data = q1data)
+mod1
+```
+
+
+## a.
+*Provide an interpretation of the exponentiated intercept term in the logistic regression model.*
+
+The exponentiated intercept in our logistic regression model is $2.13e-04$. This number represents the estimated odds of being dead at 5 years after the study for individuals with 0 values for the covariates of creatinine, age, smoking status, and an indicator for being white - in other words, a newborn, non-smoking, non-white individual with 0 mg/dl of creatinine. The interpretation of estimate is not scientifically useful.
+
+
+## b.
+*Provide an interpretation of the exponentiated age slope in the logistic regression model.*
+
+The exponentiated age slope for our model, with a value of $1.07$, represents the odds ratio of the odds of 5-year mortality for individuals differing by 1 year of age, but with all other co-variates kept constant. 1-year older individuals are expected to have a 7% higher odds of mortality.  
+
+## c.
+*From the logistic regression model, is there evidence of an association between death within 5 years of study enrollment and creatinine after adjusting for the other predictors? Give full inference.*
+
+```{r q1c }
+testC <- c(0, 1, 0, 0, 0)
+lincom(mod1, testC)
+```
+
+**Methods:**
+To evaluate an association between 5 year all-cause mortality and creatinine, we fit a multivariate logistic regression model to estimate the odds ratio of death between groups differing by $1 mg/dl$ difference in serum creatinine, while adjusting for age, smoking status, and sex in our analysis. We report the exponentiated slope from this model as an estimate of this odds ratio. Also, we report a 95%  confidence interval and the p-value for the hypothesis that the creatinine slope is equal to zero, and the exponentiated slope ( creatinine odds ratio) equals 1.**
+
+**Results: **
+We estimate the odds ratio of death for groups differing in serum creatinine level by 1 mg/dl but homogonous in age, smoking status, and white race status to be $5.22$, with a 95% CI of $(2.68, 10.16)$. Individuals with creatinine levels 1 mg/dl higher but homogonous in the other covariates have an estimated $422\%$ higher odds of 5-year mortality, and these results would not be suprising if the true value was between $168\%$ and $920\%$. At the $\alpha = 0.05$ level, we reject the null hypothesis of no association between mortality with a p-value of $0.00005$.
+
+## d.	
+*From the logistic regression model, is there evidence of an association between death within 5 years of study enrollment and age after adjusting for the other predictors? Provide full inference.*
+
+```{r q1d }
+testC <- c(0, 0, 1, 0, 0)
+lincom(mod1, testC)
+```
+**Methods:**
+We fit a multivariate logistic regression model with 5-year all-cause mortality as the response and age, sex, serum creatinine levels, smoking status, and race status as predictors. As an estimate of the odds for mortality in groups differing in age at time of study by 1 year, we report the exponentiated age slope from this model, a 95% confidence interval, and p-value for the hypothesis that the age slope is equal to zero, and the exponentiated slope ( creatinine odds ratio) equals 1.**
+
+**Results: **
+We estimate the odds ratio of death for groups differing in age by one year but homogonous in serum creatinine, smoking status, and white race status to be $1.07$. Individuals 1 year apart in age but homogonous in creatinine, race status, and smoking status have an estimated 7% higher odds of 5-year mortality, and these results would not be suprising if the true value were between $3\%$ and $11\%$. At the $\alpha = 0.05$ level, we reject the null hypothesis of no association between mortality with a p-value of $0.0002$.
+
+## e.	
+*From the logistic regression model, what is the best estimate of the odds of dying within 5 years of study enrollment for a non-white race individual who is 76 years old, has previously smoked, and has a creatinine level of 0.95.*
+
+```{r q1e }
+testC <- c(1, 0.95, 76, 1, 0)
+lincom(mod1, testC)
+```
+
+The estimated odds of dying within 5 years for this type of individual is $0.239$. 
+
+## f.
+*From the logistic regression model, what is the best estimate of the probability of dying within 5 years of study enrollment for a white race individual who is 69 years old,  has never smoked, and has a creatinine level of 1.2.*
+
+```{r q1f }
+testC <- c(1, 1.2, 69, 0, 1)
+lincom(mod1, testC)
+```
+The estiamated odds for such an idividual are $0.113$. These odds correspond to a probability of mortality of $p = o/1+o = 0.113/1.113 = .102$
+
+*******
+
+\newpage
+
+# 2.	
+*Now perform a logistic regression analysis with indicator of death within 5 years of study enrollment as the response and creatinine, age, indicator of ever smoked, indicator of white race, **and sex** as predictors.*
+
+```{r q2}
+mod2 <- regress("odds", dead_at_5yr ~ crt + age + smoked + white + male, data = mri)
+mod2
+```
+
+## a.
+*Provide an interpretation of the exponentiated intercept term in the logistic regression model.*
+
+The intercept from this model of $2.28e-04$ represents odds of 5-year mortality of an individual who is a white non-smoking newborn with a serum creatinine level of $0 mg/dl$ - a purely hypothetical type of individual. The interpretation is not useful scientifically.
+
+## b.	
+*Provide an interpretation of the exponentiated sex slope in the logistic regression model.*
+The exponentiated sex slope of $1.31$ represents the estimated odds ratio between populations of males and females consistant in smoking status, creatinine serum levels, white race indicator, and age. The males are expected to have 31% higher odds of death than the females.
+
+## c.	
+*Provide full inference for an association between all-cause mortality within 5 years and sex using the logistic regression model.*
+
+```{r q2c }
+testC <- c(0, 0, 0, 0, 0, 1)
+lincom(mod2, testC)
+```
+
+**Methods:** 
+We examined the association between all-cause 5-year-mortality and sex while adjusting for serum creatinine level, age, smoking status, and white status by fitting a logistic regression with 5-year mortality as the response and the sex, creatinine, age, smoking status, and white status as predictors. We report the exponentiated slope for sex to estimate the odds ratio between populations of males and females where the other co-variates are held constant, and compute a 95% confidence interval for this slope estimate and the p-value from a t-test for the hypothesis that the slope is equal to zero (and the exponentiated slope is 1).**
+
+**Results:**
+We estimate that the odds ratio between males and females homogenous for age, creatinine level, smoking status, and white race status is $1.31$. This suggests the males have $31\%$ higher odds of death within 5 years of the study than the females when the other covariates are adjusted for. This estimate would not be suprising if the true odds ratio was within the 95% CI of $(0.836, 2.05)$, or the odds for males were between $16.4\%$ lower and $105\%$ higher than for the group of females. At the 0.05 level, we cannot reject the null hypothesis that the adjusted odds ratio between males and females is $1$, since the p-value of the t-test is $0.240$. 
+
+
+## d.	
+*Provide full inference for an association between all-cause mortality within 5 year years and creatinine using the logistic regression.*
+```{r q2d }
+testC <- c(0, 1, 0, 0, 0, 0)
+lincom(mod2, testC)
+```
+
+**Methods:** 
+We examined the association between all-cause 5-year-mortality and serum creatinine levels while adjusting for sex, age, smoking status, and white race status by fitting a logistic regression with serum creatinine level as the response and sex, age, smoking status, and white race status as predictors. We report the exponentiated slope for sex as an estimate of the odds ratio between populations of individuals differing by $1 mg/dl$ in serum creatinine but homogenous in the other variables. We compute a 95% confidence interval for this estimate, and report the p-value from a t-test for the hypothesis that the slope is equal to zero  - and the exponentiated slope is 1 - signifying a lack of association.
+
+**Results:**
+We estimate that the odds ratio between individuals $1 mg/dl$ apart in creatinine level but homogenous for age, sex, smoking status, and white race status is $4.46$. This suggests higher-creatinine individuals are expected to have $346\%$ higher odds of death within 5 years of the study when the other covariates are adjusted for. This estimate would not be suprising if the true odds ratio was within the 95% CI of $(2.21, 9.03)$, or the odds the higher-creatinine populations were between $121\%$ and $803\%$ higher. At the 0.05 level, we can reject the null hypothesis that the adjusted odds ratio is $1$ and find evidence for a statistically significant association since the p-value of the t-test for this hypothesis is $< 0.00005$. 
+
+
+## e.	
+*Is sex a confounder, precision variable, both or neither for the associations between all-cause mortality within 5 years of study enrollment and each of the other four predictors of interest: creatinine, age, indicator of ever smoked, and  indicator of white race?  Explain and provide evidence to support your reasoning.*
+
+### Mortality vs Creatinine, unadjusted and adjusted for sex
+
+For sex to confound the association between 5-year all cause mortality and serum creatinine levels, we need evidence of an association between sex and 5-year mortality (the outcome), and an association with creatinine levels, the exposure variable. This would mean that the association between creatinine levels and mortality should be different before and after controlling for sex. Linear regression on creatinine given sex suggest and association, and the unadjusted logistic regression of creatinine on mortality also suggests an association. In addition, the odds ratio estimates for the adjusted and unadjusted analysis - $4.92$ and $5.99$ respectively, suggesting the association between mortality and creatinine levels is different when adjusting for sex. This suggests sex is a confounding variable. It is not a precision variable, since sex is associated with creatine, the predictor of interest.
+
+```{r q2e1, echo=F, eval=F, message=F}
+regress("mean", crt ~ male, data=mri)
+# [2] male           0.2689   0.02007   0.02007       0.2295    0.3083        179.59 1  < 0.00005
+
+unadjusted <- regress("odds", dead_at_5yr ~ crt, data = mri)
+# [2] crt            5.986     3.116     11.50             28.97 1  < 0.00005
+
+adjusted <- regress("odds", dead_at_5yr ~ crt + male, data = mri)
+# [2] crt            4.915     2.467     9.791             20.57 1  < 0.00005
+# [3] male           1.364     0.8814    2.111              1.95 1    0.1633 
+
+
+unadjusted
+adjusted
+```
+
+```{r q2e1g, echo=F, eval=F, message=F}
+mri[,malef:=factor(male, levels=c(0,1), labels=c('female', 'male'))]
+ggplot(mri, aes(x=crt, y=dead_at_5yr)) + geom_point() + geom_smooth()
+ggplot(mri, aes(x=crt, y=dead_at_5yr, color=malef, shape=malef, fill=malef)) + geom_point() + geom_smooth()
+```
+### Mortality vs age, unadjusted and adjusted for sex
+
+For sex to confound the association between 5-year all-cause mortality and age, we need evidence of an association between sex and 5-year mortality (the outcome), and an association between sex and age, the exposure variable. This would mean that the association between age and mortality should be different before and after controlling for sex. 
+
+Linear regression on age given sex suggest no association; additionally, the age slope estimates are almost identical between the adjusted and non-adjusted analyses, suggesting no evidence of confounding.
+
+For sex to be a potential precision variable for this association, it should be associated with the outcome (mortality), and not the predictor (age). In addition, adjusting for sex should decrease the variance of the outcome. After running linear regression of age on sex, logistic regression of mortality on sex, and the adjusted and un-adjusted regression analysis of mortality vs age, we find evidence for all of these criteria, except the increase of precision between unadjusted and adjusted analyses. 
+
+
+```{r q2e2, echo=F, eval=F, message=F}
+regress("mean", age ~ male, data=mri)
+# [2] male           0.3203    0.4023    0.4024      -0.4697    1.110           0.63 1    0.4263 
+
+regress("odds", dead_at_5yr ~ male, data=mri)
+# [2] male           2.053     1.368     3.081             12.11 1     5e-04 
+
+unadjusted <- regress("odds", dead_at_5yr ~ age, data = mri)
+# [2] age             1.073      1.037     1.111             16.15 1     1e-04 
+
+adjusted <- regress("odds", dead_at_5yr ~ age + male, data = mri)
+# [2] age             1.072      1.035     1.111             14.77 1     1e-04 
+# [3] male            2.029      1.349     3.054             11.56 1     7e-04 
+
+
+unadjusted
+adjusted
+```
+
+```{r q2e2g, echo=F, eval=F, message=F}
+ggplot(mri, aes(x=age, y=dead_at_5yr)) + geom_point() + geom_smooth()
+ggplot(mri, aes(x=age, y=dead_at_5yr, color=malef, shape=malef, fill=malef)) + geom_point() + geom_smooth()
+```
+
+### Mortality vs smoking status, unadjusted and adjusted for sex
+
+For sex to confound the association between 5-year all-cause mortality and age, we need evidence of an association between sex and 5-year mortality (the outcome), and an association between sex and smoking status, the exposure variable. This would mean that the association between age and mortality should be different before and after controlling for sex. 
+
+Logistic regression of sex on smoking status shows evidence for an association, and we previously showed evidence of a significant association between sex mortality. In addition, the estimated exponentiated slope for smoking status is $1.36$ in the unadjusted case, and $1.19$ when adjusting for sex. This evidence suggests sex confounds the mortality-smoking status association. Since sex is associated with the POI smoking status, it is not a precision variable. 
+
+```{r q2e3, echo=F, eval=F, message=F}
+regress("odds", smoked ~ male, data=mri)
+# [2] male           2.332     1.728     3.146             30.78 1  < 0.00005
+
+regress("odds", dead_at_5yr ~ male, data=mri)
+# [2] male           2.053     1.368     3.081             12.11 1     5e-04 
+
+unadjusted <- regress("odds", dead_at_5yr ~ smoked, data = mri)
+# [2] smoked         1.361     0.9090    2.038              2.25 1    0.1342 
+
+adjusted <- regress("odds", dead_at_5yr ~ smoked + male, data = mri)
+# [2] smoked         1.188     0.7841    1.801              0.66 1    0.4154 
+# [3] male           1.958     1.291     2.970             10.04 1    0.0016 
+
+
+unadjusted
+adjusted
+```
+
+```{r q2e3g, echo=F, eval=F, message=F}
+ggplot(mri, aes(x=smoked, y=dead_at_5yr)) + geom_point() + geom_smooth()
+ggplot(mri, aes(x=smoked, y=dead_at_5yr, color=malef, shape=malef, fill=malef)) + geom_point() + geom_smooth()
+```
+### Mortality vs indicator of white race, unadjusted and adjusted for sex
+
+For sex to confound the association between 5-year all-cause mortality and white race, we need evidence of an association between sex and 5-year mortality (the outcome), and an association between sex and the POI, white race indicator. After performing logistic regression of sex on the white race indicator, we do not find evidence of a significant association, suggesting sex is not a confounder. 
+
+For sex to be a potential precision variable for this association, it should be associated with the outcome (mortality), and not the predictor (white race). We find evidence for both using logistic regression.  In addition, adjusting for sex should decrease the variance of the outcome, but not change the estimated slope. After running logistic regression of sex on white race, logistic regression of mortality on sex, and the adjusted and un-adjusted regression analysis of mortality vs white race, we find evidence of these criteria. The unadjusted slope of $0.681$ is close to the adjusted slope $0.671$, the 95% CIs are a bit smaller in the adjusted analysis, and there is an association between sex and mortality, but not sex and white race, suggesting sex might be a precision variable for the mortality vs. white race indicator association. 
+
+
+```{r q2e4, echo=F, eval=F, message=F}
+regress("mean", white ~ male, data=mri)
+# [2] male          6.353e-03  0.03069   0.03069     -0.05389   0.06660          0.04 1     0.836 
+
+regress("odds", dead_at_5yr ~ male, data=mri)
+# [2] male           2.053     1.368     3.081             12.11 1     5e-04 
+
+unadjusted <- regress("odds", dead_at_5yr ~ white, data = mri)
+# [2] white          0.6806    0.4371    1.060              2.91 1    0.0884 
+
+adjusted <- regress("odds", dead_at_5yr ~ white + male, data = mri)
+# [2] white          0.6712    0.4276    1.054              3.01 1    0.0831 
+# [3] male           2.065     1.377     3.098             12.32 1    0.0005 
+
+
+unadjusted
+adjusted
+```
+
+```{r q2e4g, echo=F, eval=F, message=F}
+ggplot(mri, aes(x=age, y=dead_at_5yr)) + geom_point() + geom_smooth()
+ggplot(mri, aes(x=age, y=dead_at_5yr, color=malef, shape=malef, fill=malef)) + geom_point() + geom_smooth()
+```
+
+*****
+
+\newpage
+
+# 3.	
+*Now suppose we are interested in evaluating associations with all-cause mortality using a Poisson regression analysis. Perform a Poisson regression analysis with indicator of death within 5 years as the response and creatinine, age, indicator of ever smoked, indicator of white race, and sex as predictors.*
+
+```{r q3}
+mod3 <- regress('rate', dead_at_5yr ~ crt + age + smoked + white + male, data = mri)
+mod3
+```
+
+## a.	
+*Provide an interpretation of the exponentiated intercept term of the Poisson regression model.*
+
+The intercept in the Poisson regression model is the log probability of death from any cause within 5 years for newborn non-white males who hever smoked and have a serum creatinine level of 0 mg/dl. Exponentiating this intercept, we estimate the risk of death to be $0.00142$ for this hypothetical group, which is not meaningful scientifically.
+
+## b. 
+*Provide an interpretation of the exponentiated creatinine slope in the Poisson regression model.*
+
+The slope in the Poisson regression model is the difference in log probabilities of 5-year all-cause mortality between subjects differing by $1 mg/dl$ in serum creatinine levels, but homogonous in sex, age, smoking status, and white status. The exponentiated slope of $2.12$ represents the relative risk between such groups, and suggests individuals with the higher creatinine but constant in the other covariates are 112% more likely to die witin 5 years. 
+
+## c.	
+*Provide full inference with the Poisson regression model for an association between all-cause mortality within 5 years of enrollment and creatinine after adjusting for the other predictors.*
+
+```{r q3c}
+lincom(mod3, c(0,1,0,0,0,0))
+```
+**Methods:**
+We fit a multivariate Poisson regression with 5-year all-cause mortality as the response and the variables of creatinine serum concentration, age, sex, smoking status, and race as predictors. We report the slope for creatinine to estimate the relative risk of death for groups differing by $1 mg/dl$ in creatinine but homogenous in age, sex, race status, and smoking status. We compute a 95% CI and p-value from the hypothesis that the relative risk is equal to 1.
+
+**Results:** We estimate that for individuals differing in creatinine levels by $1 mg/dl$ but homogenous in age, white status, sex, and smoking status, those with higher creatinine have a $111\%$ higher relative risk of death within 5 years; these results would not be suprising if the true relative risk was within the $95\%$ confience interval of $51\%$ to $196\%$ This finding is statistically significant at the 0.05 level, with a p value of < 0.00005.
+
+## d.	
+*Provide full inference with the Poisson regression model for an association between all-cause mortality within 5 years of enrollment and sex after adjusting for the other predictors.*
+
+```{r q3d}
+lincom(mod3, c(0,0,0,0,0,1))
+```
+
+**Methods:**
+We fit a multivariate Poisson regression with 5-year all-cause mortality as the response and the variables of creatinine serum concentration, age, sex, smoking status, and race as predictors. We report the slope for sex to estimate the relative risk of death between males and females otherwise homogenous in age, creatinine level, race status, and smoking status. We compute a 95% CI and p-value from the hypothesis that the relative risk is equal to 1, and no adjusted association between mortality and sex exists.
+
+
+**Results:** We estimate the exponentiated sex slope to $1.35$, suggesting males have a $35\%$ higher relative risk of mortality than females of the same age, white status, smoking status, and creatinine level. These results would not be suprising if the true relative risk was within the 95\% confience interval of $-5.58\%$ to $94\%$. This finding has a p-value of $0.0995$ and is not statistically significant at the 0.05 level; we cannot reject the null hypothesis that the exponentiated sex slope is equal to 1. 
+
+**********
+\newpage
+
+
+# Appendix
+
+## Setup code
+```{r, ref.label=c("setup"), echo=TRUE, eval=TRUE, results='markup'}
+```
+
+## Question 1 code
+
+```{r, ref.label=c(c("q1", "q1c", "q1d", "q1e", "q1f")), echo=TRUE, eval=TRUE, results='markup'}
+```
+
+## Question 2 code
+
+```{r, ref.label=c("q2", "q2c", "q2d", "q2e1", "q2e2", "q2e3", "q2e4"), echo=TRUE, eval=TRUE, results='markup'}
+```
+
+## Question 3 code
+
+```{r, ref.label=c(c("q3", "q3c", "q3d")), echo=TRUE, eval=TRUE, results='markup'}
+```
+
+
+
+
+

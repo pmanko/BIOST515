@@ -1,0 +1,232 @@
+---
+title: "Homework 5"
+author: "Piotr Mankowski"
+date: "Winter 2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, eval = TRUE, results = 'hide', warning=FALSE)
+
+## load uwIntroStats
+require(uwIntroStats)
+library(data.table)
+library(ggplot2)
+library(measurements)
+
+## read-in data
+mri <- as.data.table(read.table("../data/mri.txt", header=TRUE, stringsAsFactors = FALSE))
+mri[, obstime_yr:=obstime/365]
+mri[, dead_at_5yr:=ifelse((obstime_yr <= 5.0 & death == 1), 1, 0), by='ptid']
+
+mri[,bmi:=(conv_unit(weight, "lbs", "kg")/conv_unit(height, "cm", "m")^2)]
+```
+
+# Question 1
+**We are interested in examining how mean systolic blood pressure varies by age and sex.**
+
+```{r q1}
+##############
+# Question 1
+##############
+```
+
+## a. 
+*a.	Create a scatterplot of systolic blood pressure versus age.  Use different symbols and/or colors for each sex group, and include LOWESS  (or LOESS) curves for each sex group.*
+
+```{r q1a, echo=F}
+mri[,malef:=as.factor(male)]
+ggplot(mri, aes(x=age, y=sbp, color=malef, shape=malef, fill=malef)) + geom_point() + geom_smooth()
+```
+
+\
+
+## b.   
+*Is there evidence from the scatterplot of an association between systolic blood pressure and age after adjusting for sex? Explain your reasoning.*
+
+There is evidence for an association between systolic blood pressure and age after adjusting for sex. The lowess lines for both males and females seem to have an a non-0 slope, with the mean blood pressure being different for differnt ages, suggesitng the mean blood pressure is associated with age.
+
+\
+
+## c.
+*Is there evidence from the scatterplot that sex modifies the association between systolic blood pressure and age? Explain your reasoning.*
+
+\
+In order for sex to modify the association between systolic blood pressure and age, the slope for the blood pressure-age modification should be different in each sex stratum. In the graph above, the slop of the LOESS curves should be different for males and for females. This relationship is a bit difficult to assertain, since the average slopes look close. However, the female slope does seem to be a bit steeper, and the LOESS lines are not parallell across the range of age values, so we do find some evidence that sex modifies the association between blood pressure and age. 
+
+## d.
+*Perform a statistical analysis to determine if sex modifies the association between systolic blood pressure and age.  Provide full statistical inference.*
+
+```{r q1d, echo=F}
+mod1d <- regress("mean", sbp~age*male, data=mri)
+mod1d
+```
+
+\
+
+
+**Methods:** For sex to modify the association between systolic blood pressure and age, the slope for this association should differ between age strata. We assessed whether sex modifies the association between systolic blood pressure and age by performing a multivariate linear regression with systolic blood pressure the response and age and sex the predictor variables. We inlcuded the age and sex interaction term to test for effect modification. We tested a null hypothesis that the difference between age slope of different sex groups is equal to 0 against the alternative that the age slope does differ across gender groups. We report the p-value for this test, the point estimate, and a 95\% CI of the point estimate.  
+
+\
+**Results:** Based on our linear regression model, we estimate that difference between sex groups in the difference of systolic blood pressure across age is $-0.571$, with a 95% CI of $(-1.090, -0.05200)$, suggesting the slope for the blood pressure - age association is $0.571 mm HG/year$ lower in females than males. We can reject the null hypothesis that no difference exists across the gender groups, since our p-vale equals $0.0311$
+
+*****
+\newpage
+
+
+```{r q2}
+#############
+# Question 2
+#############
+
+```
+
+# Question 2	
+**2.	Now suppose we are interested in examining how mean systolic blood pressure varies by race and age.**
+
+## a.	
+*Create a scatterplot of systolic blood pressure versus age.  Use different symbols and/or colors for each race group, and include LOWESS  (or LOESS) curves for each race group.*
+\
+
+
+```{r q2a, echo=F}
+mri[,racef:=factor(race, levels=c(1,2,3,4), labels=c('white', 'black', 'asian', 'other'))]
+ggplot(mri, aes(x=age, y=sbp)) + geom_point() + geom_smooth()
+```
+
+
+```{r q2a1, echo=F}
+mri[,racef:=factor(race, levels=c(1,2,3,4), labels=c('white', 'black', 'asian', 'other'))]
+ggplot(mri, aes(x=age, y=sbp, color=racef, shape=racef, fill=racef)) + geom_point() + geom_smooth()
+```
+
+## b.	
+*What observations do you make from the scatterplot regarding an association between systolic blood pressure and race.*
+
+\
+
+There's evidence for a positive association between systolic blood pressure and age, as seen in the first scatterplot. When stratified by race, this association does seem to  effects of race are This association does seem to be modified by race category; there is a some evidence for the slopes of the LOESS lines for white, black, and asian participants to be different, and the lines are not parallel across the age range. However, the small numbers in each race category group - and especially in the `other` group - do make such observations difficult; the SE intervals for the LOESS lines illustrate this point, with the intervals overlapping significantly across the range of ages.   
+
+## c.
+*Perform a multivariate linear regression analysis with systolic blood pressure as the response  and with race and age as predictors.  What is the baseline group for race in your regression model. Provide an interpretation of the intercept in your regression model and include the numerical value of the intercept in your interpretation. Is the intercept scientifically useful?  Briefly explain.*
+
+```{r q2c, echo=F}
+mod2c <- regress("mean", sbp~race+age, data=mri)
+mod2c
+```
+
+\
+
+The baseline group for race in our model is the race represented by a value of 0 - which is not interpretable in our original model, since race is actually an categorical variable that is not ordered, and we do not have a race corresponding to the value 0. However, we can rescale this variable to make the baseline race group correspond to one of the actual race groups. In that case, the intercept would represent the mean blood pressure for newborns of whatever race was set to 0. From our model, we estimate the intercept - the mean systolic blood pressure for newborns of race 0 (which does not exist) - to be $97.51 mm Hg$. This intercept is not sceintifically useful.
+
+
+## d. 
+*Provide an interpretation of the age slope in your regression model in part c, and include the numerical value of the age slope in your interpretation.  Is the age slope scientifically useful? Briefly explain.*
+
+\
+
+The slope for age in the regression model, estimated to be $0.425 mm Hg / year$, represents the difference in mean blood pressure in groups of similar race but age differing by 1 year. Our slope estimate suggests the mean blood pressure is higher in individuals of the same race but 1 year older by $0.425 mm Hg$.
+
+## e.	
+*Is race a confounder, precision variable, or neither for the association between systolic blood pressure and age?  Explain and provide evidence to support your reasoning.*
+
+```{r q2e, echo=F}
+mod2e1 <- regress("mean", sbp~age, data=mri)
+mod2e2 <- regress("mean", sbp~age+race, data=mri)
+
+mod2e3 <- regress("mean", sbp~age*race, data=mri)
+mod2e1
+mod2e2
+mod2e3
+```
+Race does not seem to be a precision variable; adjusting for race does not seem to decrease the variability in each race stratum, which is suggested by looking at the LOESS curves and evident when comparing regression model residual stanard error between adjusted and unadjusted models. 
+
+Race does not seem to be a confounder of the blood pressure-age association: race is not significantly associated with blood pressure itself, and this is a requirement for a confounder.
+
+## f. 
+*Perform a statistical analysis using the multivariate regression model in part c to determine if race is associated with systolic blood pressure after adjusting for age.  Provide full statistical inference.*
+
+Methods: We performed a multivariate linear regression with systolic blood pressure as the response variable and age and race as the predictors. We report the slope for race to estimate the difference in systolic blood pressure for groups of the same age but differing by race category. We compute a 95% Wald confidence interval and p-value from the t-test ofthe hypothesis that the slope is equal to zero.
+
+Results: We estimate that mean systolic blood pressure is $1.43 mm Hg$ different between populations of different racial categories but similar ages. This estimate has a 95\% CI of $(-0.800, 3.67) mm Hg$. We cannot reject the null hypothesis at $\alpha = 0.05$ that mean systolic blood pressure does not vary with racial category in populations of the same age, since the p-value for this hypothesis test equals $0.2082$ 
+*****
+\newpage
+
+
+# Question 3
+**Perform a multivariate linear regression analysis with systolic blood pressure as the response  and with race, sex, age, and an interaction for sex and age as predictors.**
+
+```{r q3}
+
+#############
+# Question 3
+#############
+
+mod3 <- regress("mean", sbp ~ race + male * age, data=mri)
+mod3
+```
+
+## a.	
+*What is the baseline group for race in your regression model. Provide an interpretation of the intercept in your regression model and include the numerical value of the intercept in your interpretation. What, if any, scientific use would you make of the intercept?*
+
+The baseline group for race in our model is the race represented by a value of 0 - which is not interpretable in our original model, since race is actually an categorical variable that is not ordered, and we do not have a race corresponding to the value 0. However, we can rescale this variable to make the baseline race group correspond to one of the actual race groups. In that case, the intercept would represent the mean blood pressure for newborns of whatever race was set to 0. From our model, we estimate the intercept - the mean systolic blood pressure for newborn females of race 0 (which does not exist) - to be $75.5 mm Hg$. This intercept is not scientifically useful.
+
+
+## b.	
+*Provide an interpretation of the sex slope in your regression model, and include the numerical value of the sex slope in your interpretation. Is the sex slope scientifically useful? Briefly explain.*
+
+The sex slope in our model, $41.3$, represents the estimated difference in blood pressure between 
+
+## c.	
+*Provide an interpretation of the age slope in your regression model, and include the numerical value of the age slope in your interpretation.  Is the age slope scientifically useful?  Briefly explain.*
+
+The age slope estimate, $0.726$, represents the difference in blood pressure in females of race 0 but differeing in age by 1 year. This slope is scientifcally for insight into the association between age and blood pressure in females of race 0; however, it gets confusing since this race does not exist
+
+## d.	
+*Perform a statistical analysis using the multivariate regression model to determine if age is associated with systolic blood pressure.  Provide full statistical inference.*
+
+We performed a multivariate regression with systolic blood pressure as the response variable, and race, sex, and age as the predictors of interest. we included an sex-age interaction term. We report the p-value of the hypothesis test that the difference in blood pressure across different ages is equal to 0, and report the point estimate of the difference in bp across age, and 95% CI for the point estimate. 
+
+The age slope estimate is $.726 mm Hg / year$, with a 95\% CI of $(0.3653, 1.087)$. We can reject the null hypothesis that age and bp are not associated at the 0.05 level, as the p-value for the test is equal to 0.0001
+
+
+## e. 
+*Perform a statistical analysis using the multivariate regression model to determine if sex is associated with systolic blood pressure.  Provide full statistical inference.*
+
+We performed a multivariate regression with systolic blood pressure as the response variable, and race, sex, and age as the predictors of interest. we included an sex-age interaction term. We report the p-value of the hypothesis test that the difference in blood pressure across different sexes is equal to 0, and report the point estimate of the difference in bp across sex, and 95% CI for the point estimate. 
+
+The sex slope estimate is $41.3 mm Hg$, with a 95\% CI of $( 2.86, 79.7)$. We can reject the null hypothesis that age and bp are not associated at the 0.05 level, as the p-value for the test is equal to $0.0352$
+
+
+
+## f.
+*Perform a statistical analysis using the multivariate regression model to determine if race is associated with systolic blood pressure. Provide full statistical inference.*
+
+We performed a multivariate regression with systolic blood pressure as the response variable, and race, sex, and age as the predictors of interest. we included an sex-age interaction term. We report the p-value of the hypothesis test that the difference in blood pressure across different races is equal to 0, and report the point estimate of the difference in bp across race with 95% CI for the point estimate. 
+
+The estimate of difference in blood pressure between races is $1.367 mm Hg$, with a 95\% CI of $(-0.843, 3.58)$. We cannot reject the null hypothesis that race and bp are not associated at the 0.05 level, as the p-value for the test is equal to $0.2250$. 
+
+## g. 
+*Perform a statistical analysis using the multivariate regression model for testing the null hypothesis that both age and sex are not associated with systolic blood pressure. Provide full statistical inference.*
+
+*****
+\newpage
+
+## Question 1 code
+
+```{r, ref.label=c("q1a", "q1d"), echo=TRUE, eval=TRUE, results='markup'}
+```
+
+
+## Question 2 code
+
+```{r, ref.label=c("q2a", "q2a1", "q2c", "q2e"), echo=TRUE, eval=TRUE, results='markup'}
+```
+
+
+## Question 3 code
+
+```{r, ref.label=c("q3"), echo=TRUE, eval=TRUE, results='markup'}
+```
+
+

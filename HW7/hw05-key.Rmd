@@ -1,0 +1,336 @@
+---
+title: "Homework 5"
+author: "BIOST 515"
+date: "March 2, 2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, results = 'hide', warning = FALSE)
+```
+
+```{r dataIn, message=FALSE}
+require(uwIntroStats)
+library(ggplot2)
+library(data.table)
+
+mri <- as.data.table(read.table("mri.txt", header = TRUE))
+```
+
+# 1.	
+*Suppose we are interested in evaluating associations with all-cause mortality using a logistic regression model.  Perform a logistic regression analysis with indicator of death within 5 years of study enrollment as the response and with creatinine, age, indicator for ever smoked, and indicator of white race as predictors.*
+
+## a.
+*Provide an interpretation of the exponentiated intercept term in the logistic regression model.*
+
+
+```{r q1}
+# Question 1(a):
+
+# indicator of observed death within 5 years
+mri$deathin5 <- ifelse(mri$obstime<=(5*365) & mri$death==1, 1, 0)
+
+# fitting the poisson regression
+poi1 <- regress("rate", deathin5 ~ crt, data = mri)
+poi1
+
+# Question 1(c):
+
+# fitting the logistic regression
+log1 <- regress("odds", deathin5 ~ crt, data = mri)
+log1
+
+```
+
+## a.	
+Provide an interpretation of the slope and the intercept in the Poisson regression model, and include the numerical values of the slope and intercept in your interpretation.
+
+**The slope in the Poisson regression model is the difference in log probabilities of death from any cause within 5 years between subjects differing in serum creatinine level by 1 mg/dl. Exponentiating the slope, we estimate that the relative risk of death from any cause within 5 years is `r sprintf("%0.4f", poi1$transformed["crt","e(Est)"])` for subjects differing in serum creatinine level by 1 mg/dl.**
+
+**The intercept in the Poisson regression model is the log probability of death from any cause within 5 years for individuals with a serum creatinine level of 0 mg/dl. Exponentiating the intercept, we estimate that the risk of death from any cause within 5 years is `r sprintf("%0.4f", poi1$transformed["Intercept","e(Est)"])` for a subject with serum creatinine level of 0 mg/dl. This estimate is not scientifically meaningful as it is outside of the interval (0,1), the parameter space for risks.**
+
+## b.	
+Give full inference for an association  between 5 year all-cause mortality and  serum creatinine levels from the Poisson regression model. 
+
+**Methods: To evaluate an association between 5 year all-cause mortality and creatinine we fit a Poisson regression model comparing the relative risk of death (or risk ratio of death) across groups defined by continuous serum creatinine level. As an estimate of the relative risk of death for groups differing in serum creatinine level by 1 mg/dl, we report the exponentiated slope from this model. Using robust standard errors, we report a 95% confidence interval and the p-value from the F-test of the hypothesis that the relative risk is equal to 1.**
+
+**Results: We estimate the relative risk of death for groups differing in serum creatinine level by 1 mg/dl to be `r sprintf("%0.4f", poi1$transformed["crt","e(Est)"])`. Based on the 95% confidence interval, this estimate would be consistent with a true relative risk between `r sprintf("%0.4f", poi1$transformed["crt","e(95%L)"])` and `r sprintf("%0.4f", poi1$transformed["crt","e(95%H)"])`. We find statistically significant evidence that the relative risk differs from 1 (p < 0.00005).**
+
+## c.	
+Compare the association results in part b that are based on risk ratios to using a logistic regression  model where odds ratios of death within 5 years are used as the summary measure for an association  with serum creatinine level (i.e., question 3 in homework 4). Briefly describe any similarities or differences in the association results.
+
+**Using a logistic regression model as in question 3 of homework 4, we found statistically significant evidence that the odds ratio of death within 5 years across groups defined by serum creatinine level differs from 1 (p < 0.00005). Hence, there is evidence of an association between between 5 year all-cause mortality and serum creatinine levels on both relative risk and odds ratio scales. **
+
+**The results of the analyses differ in that the relative risk of death for groups differing in serum creatinine level by 1 mg/dl is estimated to be `r sprintf("%0.4f", poi1$transformed["crt","e(Est)"])` while the odds ratio for groups differing in serum creatinine level by 1 mg/dl is estimated to be `r sprintf("%0.4f", log1$transformed["crt","e(Est)"])`. (Recall that the odds ratio can be used to approximate the risk ratio for rare events. However, the two measures of association are generally different, as seen here.)**
+
+*****
+
+## Question 1 code
+
+```{r, ref.label=c(c("dataIn", "q1")), echo=TRUE, eval=TRUE, results='markup'}
+```
+
+
+\newpage
+
+
+# 2.	
+Questions 3 and 4 below investigate associations between serum cholesterol level, age, sex, and body mass index (BMI).  In this question we will obtain some summary statistics for these variables.
+
+```{r q2}
+# Question 2(a)
+
+# weight is in lbs, height in cm
+
+# convert lbs to kg
+mri$wt.kg <- 0.453592 * mri$weight
+
+# convert cm to m
+mri$ht.m <- mri$height / 100
+
+# compute bmi
+mri$bmi <- mri$wt.kg / mri$ht.m^2
+
+```
+
+## a.	
+Create a variable for BMI using the height and weight measurements on the subjects.  [Hint: Make sure that appropriate conversions of the weight and height measures are used in the calculation of BMI].  Provide a figure illustrating the distribution of BMI in the sample.
+
+```{r q2plot}
+# plots
+par(mfrow = c(1,2))
+boxplot(mri$bmi, main = "Boxplot of BMI", ylab = "BMI")
+hist(mri$bmi, main = "Histogram of BMI", xlab = "BMI")
+
+```
+
+**Note that BMI = (WEIGHT in kg) / (HEIGHT in m)^2^. Since weight was recorded in pounds, we convert to kilograms by multiplying by 0.453592. Height was recorded in centimeters, so we multiply by 0.01 to recover height in meters.**
+
+**Appropriate figures to visualize the distribution of BMI include a boxplot or histogram. From either figure, we see that BMI is slightly right-skewed in the sample. The center of the distribution appears to be slightly above 26 kg/m^2^, though this will be made more rigorous in part (b) below.**
+
+## b.	
+Provide suitable descriptive statistics for serum creatinine levels, age, sex, and BMI. 
+
+```{r q2table, results='markup'}
+# Question 2(b)
+
+mri2 <- mri[, c("crt", "age", "bmi", "male")]
+mri2 <- mri2[complete.cases(mri2),]
+
+# values we want for the table
+tab1 <- descrip(mri2, strata = mri2$male)
+tab1 <- tab1[, 1:9]
+tab1 <- data.frame(tab1[, c("N", "Msng", "Mean", "Std Dev", " Min", " Max")])
+
+# rows printed as: mean (sd; min-max)
+continuous.row <- function(x, fmt = "%0.1f"){
+  paste0(sprintf(fmt, x[3]), 
+         " (", sprintf(fmt, x[4]), "; ", sprintf("%0.1f", x[5]), "-", sprintf("%0.1f", x[6]), ")")
+}
+
+# rows printed as: %
+binary.row <- function(x, fmt = "%0.1f"){
+  paste0(sprintf(fmt, x[3]*100), "%")
+}
+
+tab.vals <- c(
+  apply(tab1[1:9,], 1, continuous.row),
+  c(binary.row(tab1[10,]), "-", "-")
+)
+
+table1 <- matrix(tab.vals, ncol = 3, byrow = TRUE)
+row.names(table1) <- c("Serum creatinine (mg/dl)",
+                     "Age (years)",
+                     "BMI (kg/m^2^)",
+                     "Male")
+colnames(table1) <- c("Total", "Female", "Male")
+table1 <- cbind(c(rep("mean (sd; min-max)", 3), "%"), table1)
+table1 <- rbind(c("N", tab1[10:12, "N"]), table1)
+
+knitr::kable(table1)
+```
+
+**We present descriptive statistics for serum creatinine, age, BMI, and sex in the total sample, as well as within strata defined by sex. For serum creatinine, age, and BMI we report the mean, standard deviation (sd), as well as the minimum (min) and maximum (max) values. We report the percent (%) of male subjects in the total sample.**
+
+**We note that 2 females are missing creatinine measurements. We exclude them in subsequent regression analyses. From the table of descriptive statistics, we note that there were similar numbers of males and females in the sample. The males tended to have slightly higher serum creatinine, but had similar mean age and BMI as compared to the females.**
+
+
+*****
+
+## Question 2 code
+
+```{r, ref.label=c("q2", "q2plot", "q2table"), echo=TRUE, eval=TRUE, results='markup'}
+```
+
+
+\newpage
+
+# 3.	
+We are interested in examining how mean serum creatinine levels vary by BMI and sex. In the questions below, you do not need to provide full statistical inference. Instead, just answer the following questions.
+
+## a.	
+Create a scatterplot of serum creatinine levels versus BMI.  Use different symbols and/or colors for each sex group, and include LOWESS  (or LOESS) curves for each sex group. 
+
+**Regardless of whether LOESS or LOWESS is used, the results should be similar. We present both for the sake of demonstration.**
+
+```{r q3a, fig.height=9}
+# Question 3(a)
+
+par(mfrow = c(2, 1))
+
+# using the loess.smooth() function
+plot(mri$bmi, mri$crt, col = c("blue", "red")[2-mri$male],
+     xlab = "BMI", ylab = "Serum Creatinine", main = "Scatterplot + LOESS")
+with(mri[mri$male==1,], lines(loess.smooth(bmi,crt), col="blue", lwd=2) )
+with(mri[mri$male==0,], lines(loess.smooth(bmi,crt), col="red", lwd=2) )
+legend(x = "topright", legend = c("Males", "Females"), pch = 1, lwd = 2, col = c("blue", "red"))
+
+# using the lowess() function
+# we need to use complete cases for lowess()
+mric <- mri[complete.cases(mri[, c("bmi", "crt")]),]
+
+plot(mric$bmi, mric$crt, col = c("blue", "red")[2-mric$male],
+     xlab = "BMI", ylab = "Serum Creatinine", main = "Scatterplot + LOWESS")
+with(mric[mric$male==1,], lines(lowess(bmi,crt), col="blue", lwd=2) )
+with(mric[mric$male==0,], lines(lowess(bmi,crt), col="red", lwd=2) )
+legend(x = "topright", legend = c("Males", "Females"), pch = 1, lwd = 2, col = c("blue", "red"))
+
+```
+
+## b.	
+What observations do you make from the scatterplot in part a regarding the association between serum creatinine levels and BMI?   
+
+**From the scatterplot, it appears that there is not a strong association between serum creatinine levels and BMI. There is evidence of heteroskedasticity across values of BMI; the variability of serum creatinine appears greater at lower levels of BMI. There are also a handful of outlying values for both serum creatinine and BMI.**
+
+## c.	
+Is there evidence from descriptive statistics (question 2) and the scatterplot in part a that sex modifies the association between serum creatinine level and BMI? Explain your reasoning.
+
+**We do not find evidence that sex modifies the association between serum creatinine level and BMI. If sex modifies the association between serum creatinine level and BMI, we should see a difference in the slope of the LOESS curves for males and females. From the scatterplot, we see that the sex-specific LOESS curves are parallel across the entire range of BMI values.**
+
+## d.	
+Is there evidence from descriptive statistics (question 2) and the scatterplot in part a that sex confounds the association between serum creatinine level and BMI? Explain your reasoning.
+
+**In order for sex to confound the association between serum creatinine level and BMI, we need evidence of association between sex and creatinine and sex and BMI. From the descriptive statistics in question 2, males appear to have higher creatinine levels than females on average (1.2 mg/dl in males versus 0.9 mg/dl in females). This difference is also evident from the scatterplot. From the descriptive statistics in question 2, males and females appear to have similar BMI on average (26.3 kg/m^2^ in males versus 26.4 kg/m^2^ in females). Since sex does not appear associated with the predictor, BMI, in the sample, there is not evidence that sex confounds the association between serum creatinine level and BMI.**
+
+## e.	
+Perform an analysis to determine whether mean serum creatinine levels differ across sex groups. Briefly describe the analysis that you performed and clearly state the basis of your conclusion regarding an association.  
+
+```{r q3e, message = FALSE}
+# Question 3(e)
+t.test(crt~male, data = mri)
+
+regress("mean", crt~male, data = mri)
+
+```
+
+**We perform a two-sample t-test to assess whether mean serum creatinine levels differ across sex groups. The p-value for the test is <0.0001, so we find statistically significant evidence that mean serum creatinine levels differ across sex groups.**
+
+**An alternative analysis would be to fit a linear regression with serum creatinine measured continuously as the response and sex coded as an indicator variable which is equal to 1 for male subjects as the predictor. The slope from this model is interpretable as the difference in means between males and females.**
+
+**We find that males have serum creatinine levels that are 0.2689 mg/dl higher than females on average. Based on the 95% confidence interval, this estimated difference in mean creatinine is consistent with a true difference between 0.2295 and 0.3083 mg/dl higher in the males. With p < 0.00005, we have statistically significant evidence of non-zero linear trend in mean serum creatinine levels by BMI.**
+
+## f.	
+Perform an analysis to determine whether there is a linear trend in mean serum creatinine levels by BMI. Briefly describe the analysis that you performed and clearly state the basis of your conclusion regarding an association.  
+
+```{r 3f}
+# Question 3(f)
+regress("mean", crt~bmi, data = mri)
+
+```
+
+**We fit a linear regression model with serum creatinine as the response and BMI as the predictor, both measured continuously. To assess the presence of a linear trend, we test whether the slope coefficient from this model differs from zero. We report results from the Wald test based on robust standard errors.**
+
+**With a p-value of 0.3113, we do not have statistically significant evidence that there is a linear trend in mean serum creatinine by BMI.**
+
+## g.	
+Perform an analysis to determine whether mean serum creatinine levels differ across sex groups after adjustment for BMI. Briefly describe the analysis that you performed and clearly state the basis of your conclusion regarding an association.
+
+```{r 3g}
+# Question 3(g)
+regress("mean", crt~male+bmi, data=mri)
+
+```
+
+**We fit a linear regression model with serum creatinine as the response and include both an indicator of male sex and BMI measured continuously as predictors. To assess whether mean serum creatinine levels differ across sex groups after adjustment for BMI, we test whether the slope coefficient for sex from this model is zero. We report results from the Wald test based on robust standard errors.**
+
+**The test of whether the slope coefficient for sex from this model is zero has a p-value that is < 0.00005. Hence, we have statistically significant evidence that mean serum creatinine levels differ across sex groups after adjustment for BMI.**
+
+## h.	
+Perform an analysis to determine whether there is a linear trend in mean serum creatinine levels by BMI after adjustment for sex. Briefly describe the analysis that you performed and clearly state the basis of your conclusion regarding an association.  
+
+**We fit a linear regression model with serum creatinine as the response and include both an indicator of male sex and BMI measured continuously as predictors - this is the model we fit above in part (g). To assess whether there is a linear trend in mean serum creatinine levels by BMI after adjustment for sex, we test whether the slope coefficient for BMI from this model differs from zero. We report results from the Wald test based on robust standard errors.**
+
+**The test of whether the slope coefficient for BMI from this model is zero has a p-value that is 0.1929. Hence, we do not have statistically significant evidence that mean serum creatinine levels differ across sex groups after adjustment for BMI.**
+
+## i.	
+Perform an analysis to determine if sex modifies the association between mean serum creatinine levels and BMI.  Briefly describe the analysis that you performed and clearly state the basis of your conclusion regarding an association.  
+
+```{r q3i}
+# Question 3(i)
+regress("mean", crt~male*bmi, data = mri)
+```
+
+**We fit a linear regression model with serum creatinine as the response and include both an indicator of male sex and BMI measured continuously as predictors, as well as an interaction term given as the product of sex and BMI. To assess whether sex modifies the association between mean serum creatinine levels and BMI, we test whether the slope coefficient for the sex-BMI interaction from this model differs from zero. We report results from the Wald test based on robust standard errors.**
+
+**Since the test of the interaction term from this model has a p-value of 0.5262, we do not have evidence that the sex modifies the association between serum creatinine and BMI.**
+
+## j.	
+How would you summarize the association between serum creatinine levels and BMI and sex? Provide a summary of your findings that is suitable for inclusion in a manuscript.
+
+**We find that adjusting for BMI, mean serum creatinine levels are 0.2696 mg/dl higher in males than females. This finding is statistically significant (p < 0.00005) and would be consistent with mean creatinine levels 0.2305 to 0.3087 mg/dl higher in males based on the 95% confidence interval (using robust standard errors).**
+
+**Adjusting for sex, we estimate that for groups differing in BMI by 1 kg/m^2^ mean serum creatinine levels are 0.003821 mg/dl higher in the group with greater BMI. However, this finding is not statistically significant (p = 0.1929) and would be consistent with mean creatinine levels 0.001934 mg/dl lower to 0.009576 mg/dl higher in the group with greater BMI based on the 95% confidence interval (using robust standard errors).**
+
+
+*****
+
+## Question 3 code
+
+```{r, ref.label=c(c("q3a", "q3e", "q3f", "q3g", "q3i")), echo=TRUE, eval=TRUE, results='markup'}
+```
+
+
+\newpage
+
+# 4.	
+Now consider a multivariate linear regression analysis with serum creatinine level as the response and the variables age, sex, and BMI as predictors.
+
+```{r q4}
+mod4 <- regress("mean", crt~age+male+bmi, data = mri)
+mod4
+```
+
+## a.	
+Provide an interpretation of the intercept in the regression model. Is the intercept estimate scientifically useful?
+
+**The intercept from this model represents the mean serum creatinine level of an individual that is 0 years old, female, and has BMI of 0 kg/m^2^. This is not scientifically useful for multiple reasons. The sampling for this study included only elderly individuals aged 65 years and older, so extrapolating to a newborn would be inappropriate. Additionally, this hypothetical newborn has 0 BMI, which is not possible.**
+
+## b.	
+Give full inference for the age slope in the regression model.
+
+**Methods: We fit a linear regression with serum creatinine level as the response and the variables age, sex, and BMI as predictors. We report the slope for age to estimate the difference in mean serum creatinine for groups differing in age by 1 year but homogenous in sex and BMI. We compute a 95% Wald confidence interval and p-value from the t-test of the hypothesis that the slope is equal to zero.**
+
+**Results: We estimate that for individuals differing in age by 1 year but homogenous in sex and BMI the older group has mean serum creatinine that is 0.005823 mg/dl higher. Based on the 95% confidence interval, this estimate is consistent with a true difference of 0.001401 to 0.01024 mg/dl higher in the older group. This finding is statistically significant at the 0.05 level (p = 0.0099).**
+
+## c.	
+Give full inference for the sex slope in the regression model.
+
+**Methods: We fit a linear regression with serum creatinine level as the response and the variables age, sex, and BMI as predictors. We report the slope for sex to estimate the difference in mean serum creatinine for groups differing in sex but homogenous in age and BMI. We compute a 95% Wald confidence interval and p-value from the t-test of the hypothesis that this difference is equal to zero.**
+
+**Results: We estimate that for individuals differing sex but homogenous in age and BMI the male group has mean serum creatinine that is 0.2682 mg/dl higher. Based on the 95% confidence interval, this estimate is consistent with a true difference of 0.01966 to 0.2296 mg/dl higher in the male group. This finding is statistically significant at the 0.05 level (p < 0.00005).**
+
+## d.	
+Give full inference for the BMI slope in the regression model.
+
+**Methods: We fit a linear regression with serum creatinine level as the response and the variables age, sex, and BMI as predictors. We report the slope for BMI to estimate the difference in mean serum creatinine for groups differing in BMI by 1 kg/m^2^ but homogenous in age and sex. We compute a 95% Wald confidence interval and p-value from the t-test of the hypothesis that the slope is equal to zero.**
+
+**Results: We estimate that for individuals differing in BMI by 1 kg/m^2^ but homogenous in age and sex the group with higher BMI has mean serum creatinine that is 0.005362 mg/dl higher. However, this finding is not statistically significant at the 0.05 level (p = 0.0528). Based on the 95% confidence interval, this estimate is consistent with a true difference of 0.0000644 mg/dl lower to 0.01079 mg/dl higher in the group with higher BMI.**
+
+*****
+
+## Question 4 code
+
+```{r, ref.label=c("q4"), echo=TRUE, eval=TRUE, results='markup'}
+```
+
+

@@ -1,0 +1,234 @@
+---
+title: "Homework 8"
+author: "Piotr Mankowski"
+date: "March 9, 2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, results = 'hide', warning = FALSE)
+
+require(uwIntroStats)
+library(ggplot2)
+library(data.table)
+library(survival)
+library(survminer)
+
+mri <- as.data.table(read.table("../data/mri.txt", header = TRUE))
+mri[, obstime_yr:=obstime/365]
+mri[, dead_at_5yr:=ifelse((obstime_yr <= 5.0 & death == 1), 1, 0), by='ptid']
+mri[, white:=as.integer(race == 1)]
+mri[, smoked:=as.integer(packyrs > 0)]
+```
+
+# 1.	
+*Suppose we are interested in any association between risk of all-cause mortality and sex using the Kaplan-Meier estimator of the survival function. Estimate survival functions for the two sex groups using the Kaplan-Meier estimator.*
+
+```{r q1}
+surv <- mri[,Surv(time=obstime_yr, event=death)]
+mri.df <- as.data.frame(mri)
+mri.df$surv <- surv
+
+kms <- survfit(surv ~ male, data=mri)
+```
+
+
+## a.
+*Provide a plot with the Kaplan-Meier estimated survival functions for the two sex groups. The two Kaplan-Meier curves should appear on the same plot. Also briefly comment on any differences/similarity of the survival curves.*
+
+```{r q1a}
+mri[death == 0, min(obstime_yr)]
+ggsurvplot(kms, data=mri, risk.table = 'nrisk_cumevents',  conf.int=TRUE, ggtheme = theme_minimal())
+```
+
+In this question, we're looking at the survival of individuals in the MRI study, and comparing the survival curves of males and females. The participants were followed from the start of the study until either their death, or until September 16th, 1997; all participants whose death was not encountered had at least 5 years of follow-up, resulting in a right-censored dataset. The curves are similar, with a clustering of censoring events between years 5 and 6. This is expected, since recruitment likely happened over a ~1 year period, and all follow-ups were finished on the one date. The Kaplan-Meier Plot suggests that females in this population had overall higher survival rates than males, which also makes sense logically, as women tend to have longer life-spans.
+
+## b.
+*Is there an association between risk of all-cause mortality and sex based on the Kaplan-Meier survival estimates?  Explain and provide appropriate statistical evidence supporting your reasoning.*
+
+From looking at the graph, there does seem to be evidence of an association between mortality and sex; The two KM curves diverge, and have non-overlapping confidence itervals. Using the Mantel-Haenszel Log-rank test to determine if the difference between the survival curves is statistically significant, we find the p-value testing the null hypothesis of equality between the curves vs. the alternate hypothesis that the curves are not equal to be $0.000156$. This result suggests that, at $\alpha = 0.05$, we should reject the null hypothesis, supporting our observation of the KM curves that there is a statistically-significant association between mortality and sex in this population. 
+
+```{r q1b}
+survdiff(surv ~ male, data=mri.df)
+```
+
+
+*******
+
+\newpage
+
+# 2.	
+*Now suppose we are interested in any association between risk of all-cause mortality and sex using a Cox proportional hazards regression model. Perform a Cox proportional hazards regression analysis of risk of mortality with sex as a predictor.*
+
+```{r q2}
+m2 <- coxph(surv ~ male, data=mri.df)
+summary(m2)
+```
+## a.
+*Provide an interpretation of the exponentiated slope for sex in your proportional hazards regression model.*
+
+The exponentiated slope of our regression model has a value of $1.96$, and represents the hazard ratio for death between males and females, with males having a $96\%$ higher instantenous death risk. 
+
+## b.	
+*Provide full inference for an association between risk of mortality and sex from the Cox proportional hazards regression model in part a.*
+
+**Methods:**
+We investigated the association between the risk of all-cause mortality and sex for the participants of the MRI study by fitting a Cox proportional hazards regression model to survival data from the MRI study. We report the exponentiated slope for sex to estimate the hazard ratio between the two sex groups, and compute a 95% confidence interval for this estimate. We also report the the p-value for the null hypothesis that the exponentiated slope is equal to 1 (signifying equal hazard for the two groups) vs. an alternate that the slope is not equal to 1 and males and females have statistically different mortality hazards. 
+ 
+**Results:**
+From proportional hazards regression analysis, we estimate that the risk of death for males is $96.2\%$ higher than for females in our study population. This estimate is highly statistically significant with a p-value of $0.000206$. A $95\%$ CI of $(1.374, 2.8)$ suggests that our results would not be unusual if the true risk of death for males was betwen $37.4\%$ and $180\%$ higher than for females. 
+
+## c.	
+*Compare the risk of mortality and sex association results from the Cox proportional hazards regression model to the association results in problem 1 obtained using the Kaplan-Meier method.  Briefly discuss any differences in assumptions between the two methods.*
+
+The Kaplan-Meier method for survival analysis and the Log-rank test used in question 1 are non-parametric approaches that do not aim to fit any parameters, while the Cox proportional hazards regression analysis from this question is semi-parametric: the model fits a slope parameter to represent the hazard ratio, but does not fit a paramter for the baseline hazard. 
+
+Both methods agree that there's a statistically significant association between sex and mortality in the study population, and give similar p-values for this result: $0.000156$ for the Log-rank test of KM survival estimates, and $0.000206$ for Cox proportional hazards regression. 
+
+The Cox proportional hazards model provides an interpretable fitted estimate for the slope parameter that estimates what the actual difference in the risk of mortality is between the two groups. Being non-parametric, the KM approach does not provide such information.
+
+*****
+
+\newpage
+
+# 3.	
+*Now conduct a Cox proportional hazards regression analysis for risk of all-cause mortality with both sex and age at the time of study enrollment included as predictors.*
+
+```{r q3}
+m3 <- coxph(surv ~ male + age, data=mri.df)
+summary(m3)
+```
+
+## a.	
+*Provide an interpretation of the exponentiated slope for sex in your Cox proportional hazards regression model.*
+
+The exponentiated sex slope of our regression model has a value of $1.903$, and represents the hazard ratio for death between males and females of the same age, with males having a $90.3\%$ higher instantenous death risk. 
+
+## b. 
+*Provide an interpretation of the exponentiated slope for age in your Cox proportional hazards regression model.*
+
+The exponentiated age slope of our regression model has a value of $1.07$, and represents the hazard ratio for death between two groups of the same sex, but differing by one year in age. The older individuals are estimated to have a $7\%$ higher risk of death than the younger individuals. 
+
+## c.	
+*Provide full inference for an association between risk of all-cause mortality and sex with the Cox proportional hazards regression model.*
+
+**Methods:**
+We investigated the association between the risk of all-cause mortality and sex for same-age participants of the MRI study by fitting a Cox proportional hazards regression model using Huber-white estimates of the standard error to the survival data. We report the exponentiated slope for sex to estimate the hazard ratio between individuals with the same age but different sexes, and compute a 95% confidence interval for this estimate. We also report the the p-value for the null hypothesis that the exponentiated slope is equal to 1 (signifying equal hazard for the two groups) vs. an alternate that the slope is not equal to 1, and males and females of the same age have a statistically different mortality risk. 
+ 
+**Results:**
+From proportional hazards regression analysis, we estimate that the risk of death for males is $90.3\%$ higher than for females of the same age in our study population. This estimate is highly statistically significant with a p-value of $0.000403$. A $95\%$ CI of $(1.33, 2.72)$ suggests that our results would not be unusual if the true risk of death for males was betwen $33\%$ and $172\%$ higher than for females. 
+
+## d. 
+*Provide full inference for an association between risk of all-cause mortality and age with the Cox proportional hazards regression model.*
+
+**Methods:**
+We investigated the association between the risk of all-cause mortality and age for same-sex participants of the MRI study by fitting a Cox proportional hazards regression model using Huber-white estimates of the standard error to the survival data. We report the exponentiated slope for age to estimate the hazard ratio between individuals of the same sex but 1 year apart in age, and compute a 95% confidence interval for this estimate. We also report the the p-value for the null hypothesis that the exponentiated age slope is equal to 1 (signifying equal hazard for the two groups) vs. an alternate that the slope is not equal to 1, and age is associated with mortality. 
+ 
+**Results:**
+From proportional hazards regression analysis, we estimate that, for two groups of the same sex but differing by 1 year in age, the risk of death is $7\%$ higher for the older group. This estimate is highly statistically significant with a p-value of $1.07 \times 10^{-6}$. A $95\%$ CI of $(1.040, 1.095)$ suggests that our results would not be unusual if the true risk of death for same-sex individuals but 1 year of age apart was between $4\%$ and $9.5\%$ higher for the older group.
+
+## e.	
+*Does age at the time of study enrollment confound the association between risk of all-cause mortality and sex?  Explain and provide evidence to support your reasoning.*
+
+```{r q3e}
+regress("mean", age ~ male, data=mri)
+```
+
+In this analysis, our outcome variable is all-cause mortality risk, and our predictor of interest is sex. Although we show the age covariate to be associated with all-cause mortality and likely causal in the real world through a different pathway than sex, there is no evidence for a significant association between age and our predictor of interest, sex. A simple linear regression testing this association has a p-value of 0.426, suggesting the association is not statistically significant. This result, in turn, suggests that age does not confound the association in question.  
+
+**********
+
+\newpage
+
+# 4.	
+*Now perform a Cox proportional hazards regression analysis of all-cause mortality with creatinine, age, sex, and indicator of ever smoked included as predictors.*
+
+```{r q4}
+m4 <- coxph(surv ~ crt + age + male + smoked, data=mri.df)
+summary(m4)
+```
+
+
+## a.
+*Provide full inference for an association between risk of all-cause mortality and creatinine with the proportional hazards regression model.*
+
+**Methods:**
+We investigated the association between the risk of all-cause mortality and serum creatinine levels for individals of the same sex, age, and smoking status by fitting a Cox proportional hazards regression model using Huber-white estimates of the standard error to the MRI data. We report the exponentiated slope for creatinine to estimate the hazard ratio between individuals of the same sex, age, and smoking status, but with values of creatinine 1 mg/dl apart, and compute a 95% confidence interval for this estimate. We also report the the p-value for the null hypothesis that the exponentiated creatinine slope is equal to 1 (signifying no association between mortality risk and creatinine) vs. an alternate that the slope is not equal to 1. 
+ 
+**Results:**
+From proportional hazards regression analysis, we estimate that, for two groups of the same sex, age, and smoking status but 1 mg/dl apart in serum creatinine levels, the risk of death is $249\%$ higher for the higher-creatinine group. This estimate is highly statistically significant with a p-value of $1.04 \times 10^{-8}$. A $95\%$ CI of $(2.27, 5.35)$ suggests that our results would not be unusual if the true risk of death was between $127\%$ and $434\%$ higher for the higher-creatinine group.
+
+## b.
+*Provide full inference for an association between risk of all-cause mortality and smoking with the proportional hazards regression model.*
+1.335   0.9202     1.936 0.128
+
+**Methods:**
+We investigated the association between the risk of all-cause mortality and smoking status for individals of the same sex, age, and serum creatinine levels by fitting a Cox proportional hazards regression model using Huber-white estimates of the standard error to the MRI data. We report the exponentiated slope for age to estimate the hazard ratio between individuals of the same sex, creatinine level, and smoking status, but 1 year apart in age, and compute a 95% confidence interval for this estimate. We also report the the p-value for the null hypothesis that the exponentiated age slope is equal to 1 (signifying no association between mortality risk and age) vs. an alternate that the slope is not equal to 1. 
+ 
+**Results:**
+From proportional hazards regression analysis, we estimate that, for two groups of the same sex, serum creatinine level, and smoking status but 1 year apart in age, the risk of death is $33.5\%$ higher for the older group. This estimate is not statistically significant at $\alpha = 0.05$, with a p-value of $0.128$. A $95\%$ CI of $(0.920, 1.936)$ suggests that our results would not be unusual if the true risk of mortality was between $8\%$ lower and $93.6\%$ higher for the older group.
+
+**********
+
+\newpage
+
+# 5.
+*Now perform a Cox proportional hazards regression analysis and provide inference on whether sex modifies an age and ever smoked adjusted association between mortality and creatinine.  Explain and provide full inference supporting your reasoning.*
+
+```{r q5}
+m5_males <- coxph(surv ~ crt + age + smoked, data=mri.df[which(mri.df$male == 1), ])
+m5_females <- coxph(surv ~ crt + age + smoked, data=mri.df[which(mri.df$male == 0), ])
+
+
+mri.df$maleANDcrt <- mri.df$male * mri.df$crt
+m5 <- coxph(surv ~ crt + age + smoked + male + maleANDcrt, data=mri.df)
+m5 <- coxph(surv ~ crt * male + age + smoked, data=mri.df)
+
+summary(m5_males)
+summary(m5_females)
+summary(m5)
+```
+
+**Methods:**
+We investigated the association between the risk of all-cause mortality and blood creatinine levels adjusted for age and smoking status, and determined if there's evidence this association is modified by sex. We performed a Cox proportional hazards regression, using Huber-White estimates of the standard error, on all-cause mortality survival data. In our model, we included serum creatinine as the predictor of interest, added age, smoking status, and sex as co-variates, and included a creatinine-sex interaction term to look at whether sex modifies the creatinine - mortality association. We report the slope for the creatinine-sex interaction term, and compute a 95% confidence interval for this estimate. We also report the the p-value for the null hypothesis that this slope slope is equal to 0, which signifies no interaction btween the two variables. 
+ 
+**Results:**
+From proportional hazards regression analysis, we estimate that the slope of the interaction term between creatinine and sex is $0.434$. This estimate is not statistically significant at $\alpha = 0.05$, with a p-value of $0.340$. A $95\%$ CI of $(-0.021, 0.889)$ suggests that our results would not be unusual if the true creatinine-sex interaction term slope was between these two values. 
+
+The interaction term - which can be interpreted as the difference in slopes for creatinine between populations of males and females, with males having the larger slope - is estimated to not be 0. This would suggest sex modifies the creatinine-mortality association. However, this result is not statistically significant; we cannot reject the null hypothesis that the interaction slope is, in fact, 0 based on our regression results. Therefore, we cannot say that there's statistical evidence for effect modification. 
+
+**********
+
+\newpage
+# Appendix
+
+## Setup code
+```{r, ref.label=c("setup"), echo=TRUE, eval=TRUE, results='markup'}
+```
+
+## Question 1 code
+
+```{r, ref.label=c(c("q1", "q1a", "q1b")), echo=TRUE, eval=TRUE, results='markup'}
+```
+
+## Question 2 code
+
+```{r, ref.label=c("q2"), echo=TRUE, eval=TRUE, results='markup'}
+```
+
+## Question 3 code
+
+```{r, ref.label=c("q3", "q3e"), echo=TRUE, eval=TRUE, results='markup'}
+```
+
+## Question 4 code
+
+```{r, ref.label=c("q4"), echo=TRUE, eval=TRUE, results='markup'}
+```
+
+## Question 5 code
+
+```{r, ref.label=c("q5"), echo=TRUE, eval=TRUE, results='markup'}
+```
+
+

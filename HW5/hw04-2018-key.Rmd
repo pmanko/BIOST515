@@ -18,7 +18,7 @@ require(uwIntroStats)
 ##############
 
 ## read-in data
-mri <- read.table("../../Datasets/mri.txt", header=TRUE)
+mri <- read.table("../../Datasets/mri.txt", header=TRUE, stringsAsFactors = FALSE)
 
 # create indicator for death within 5 years
 mri$death5 <- (mri$obstime < 5*365) & (mri$death == 1)
